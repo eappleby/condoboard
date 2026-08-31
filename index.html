@@ -3,148 +3,208 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Condo Board</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127970;</text></svg>">
+  <title>372 12th</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231d4ed8'/><text x='32' y='42' font-family='Helvetica,Arial,sans-serif' font-size='26' font-weight='bold' fill='white' text-anchor='middle'>372</text></svg>">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
   <div class="gate" id="gate" hidden>
     <form class="gate-card" id="gate-form">
-      <div class="gate-icon">&#127970;</div>
-      <h1 id="gate-title">Condo Board</h1>
+      <h1 id="gate-title">372 12th</h1>
       <p class="gate-sub">Enter the board password to continue.</p>
-      <input type="password" class="input" id="gate-input" autocomplete="current-password"
-             placeholder="Password" aria-label="Board password">
-      <p class="gate-err" id="gate-err" hidden>That password didn't work. Try again.</p>
-      <button type="submit" class="btn btn-primary gate-btn">Enter</button>
-      <label class="gate-remember">
-        <input type="checkbox" id="gate-remember" checked> Remember me on this device
+      <label class="field">
+        <span>Password</span>
+        <input type="password" class="input" id="gate-input" autocomplete="current-password">
+      </label>
+      <p class="gate-err" id="gate-err" role="alert" hidden>That password did not work. Please try again.</p>
+      <button type="submit" class="btn btn-primary btn-block">Enter</button>
+      <label class="checkbox-row">
+        <input type="checkbox" id="gate-remember" checked>
+        <span>Remember me on this device</span>
       </label>
     </form>
   </div>
 
   <div id="demo-banner" class="demo-banner" hidden>
-    <strong>Demo mode</strong> &mdash; Supabase isn't connected yet, so you're seeing sample data and changes won't be saved. Edit <code>config.js</code> to connect your database (see README).
+    <strong>Demo mode.</strong> Supabase is not connected yet, so this is sample data and changes will not be saved.
+    Edit <code>config.js</code> to connect the database. See the README for details.
   </div>
 
   <header class="topbar">
     <div class="topbar-inner">
-      <div class="brand">
-        <span class="brand-icon">&#127970;</span>
-        <span class="brand-name" id="brand-name">Condo Board</span>
-      </div>
-      <nav class="tabs" id="tabs">
-        <button class="tab active" data-tab="dashboard">Dashboard</button>
+      <button class="menu-btn" id="menu-open" aria-label="Open menu" aria-expanded="false" aria-controls="sidebar">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
+          <rect x="3" y="5"  width="18" height="2.4" rx="1.2" fill="currentColor"/>
+          <rect x="3" y="11" width="18" height="2.4" rx="1.2" fill="currentColor"/>
+          <rect x="3" y="17" width="18" height="2.4" rx="1.2" fill="currentColor"/>
+        </svg>
+      </button>
+      <div class="brand" id="brand-name">372 12th</div>
+      <nav class="tabs" id="tabs" aria-label="Sections">
+        <button class="tab active" data-tab="dashboard" aria-current="page">Dashboard</button>
         <button class="tab" data-tab="tasks">Responsibilities</button>
         <button class="tab" data-tab="vendors">Vendors</button>
+        <button class="tab" data-tab="accounts">Accounts</button>
         <button class="tab" data-tab="board">Board</button>
       </nav>
-      <button class="btn btn-primary" id="btn-new-task">+ New responsibility</button>
-      <button class="btn-icon btn-lock" id="btn-lock" title="Lock this browser" hidden>&#128274;</button>
+      <button class="btn btn-primary topbar-add" id="btn-new-task">Add responsibility</button>
     </div>
   </header>
 
-  <main class="container">
+  <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
+  <div class="sidebar" id="sidebar" role="dialog" aria-modal="true" aria-label="Menu" hidden>
+    <div class="sidebar-head">
+      <span class="brand" id="sidebar-brand">372 12th</span>
+      <button class="btn-close" id="menu-close" aria-label="Close menu">Close</button>
+    </div>
+    <nav class="sidebar-nav" aria-label="Sections">
+      <button class="tab active" data-tab="dashboard" aria-current="page">Dashboard</button>
+      <button class="tab" data-tab="tasks">Responsibilities</button>
+      <button class="tab" data-tab="vendors">Vendors</button>
+      <button class="tab" data-tab="accounts">Accounts</button>
+      <button class="tab" data-tab="board">Board</button>
+    </nav>
+    <div class="sidebar-actions">
+      <button class="btn btn-primary btn-block" id="btn-new-task-side">Add responsibility</button>
+    </div>
+  </div>
+
+  <main class="container" id="main">
     <!-- ============ DASHBOARD ============ -->
-    <section id="view-dashboard" class="view">
+    <section id="view-dashboard" class="view" aria-label="Dashboard">
       <div class="stats" id="stats"></div>
       <div class="dash-grid">
         <div class="dash-col">
-          <div class="dash-section" id="dash-overdue">
-            <h2><span class="dot dot-red"></span>Overdue</h2>
+          <section class="dash-section">
+            <h2><span class="status-key status-key-overdue">Overdue</span></h2>
             <div class="card-list" id="list-overdue"></div>
-          </div>
-          <div class="dash-section" id="dash-soon">
-            <h2><span class="dot dot-amber"></span>Due in the next 30 days</h2>
+          </section>
+          <section class="dash-section">
+            <h2><span class="status-key status-key-soon">Due in the next 30 days</span></h2>
             <div class="card-list" id="list-soon"></div>
-          </div>
-          <div class="dash-section" id="dash-later">
-            <h2><span class="dot dot-blue"></span>Coming up later</h2>
+          </section>
+          <section class="dash-section">
+            <h2><span class="status-key status-key-later">Coming up later</span></h2>
             <div class="card-list" id="list-later"></div>
-          </div>
+          </section>
         </div>
-        <div class="dash-col dash-col-side">
-          <div class="dash-section" id="dash-inprogress">
-            <h2><span class="dot dot-purple"></span>In progress</h2>
+        <div class="dash-col">
+          <section class="dash-section">
+            <h2><span class="status-key status-key-progress">In progress</span></h2>
             <div class="card-list" id="list-inprogress"></div>
-          </div>
-          <div class="dash-section" id="dash-done">
-            <h2><span class="dot dot-green"></span>Recently completed</h2>
+          </section>
+          <section class="dash-section">
+            <h2><span class="status-key status-key-done">Recently completed</span></h2>
             <div class="card-list" id="list-done"></div>
-          </div>
+          </section>
+          <section class="dash-section">
+            <h2><span class="status-key status-key-nodate">No date set</span></h2>
+            <div class="card-list" id="list-nodate"></div>
+          </section>
         </div>
       </div>
     </section>
 
     <!-- ============ RESPONSIBILITIES ============ -->
-    <section id="view-tasks" class="view" hidden>
+    <section id="view-tasks" class="view" aria-label="Responsibilities" hidden>
       <div class="filter-bar">
-        <input type="search" id="task-search" placeholder="Search responsibilities&hellip;" class="input search-input">
-        <select id="filter-status" class="input">
-          <option value="">All statuses</option>
-          <option value="open">Open</option>
-          <option value="in_progress">In progress</option>
-          <option value="done">Done</option>
-        </select>
-        <select id="filter-category" class="input"><option value="">All categories</option></select>
-        <select id="filter-assignee" class="input"><option value="">Everyone</option></select>
+        <label class="field search-field">
+          <span class="visually-hidden">Search responsibilities</span>
+          <input type="search" id="task-search" placeholder="Search responsibilities" class="input">
+        </label>
+        <label class="field">
+          <span class="visually-hidden">Filter by status</span>
+          <select id="filter-status" class="input">
+            <option value="">All statuses</option>
+            <option value="open">Open</option>
+            <option value="in_progress">In progress</option>
+            <option value="done">Done</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="visually-hidden">Filter by category</span>
+          <select id="filter-category" class="input"><option value="">All categories</option></select>
+        </label>
+        <label class="field">
+          <span class="visually-hidden">Filter by assignee</span>
+          <select id="filter-assignee" class="input"><option value="">Everyone</option></select>
+        </label>
       </div>
       <div class="table-wrap">
         <table class="table" id="task-table">
           <thead>
             <tr>
-              <th style="width:34%">Responsibility</th>
-              <th>Category</th>
-              <th>Assigned to</th>
-              <th>Due</th>
-              <th>Repeats</th>
-              <th>Status</th>
-              <th></th>
+              <th scope="col" class="col-title">Responsibility</th>
+              <th scope="col">Category</th>
+              <th scope="col">Assigned to</th>
+              <th scope="col">Due</th>
+              <th scope="col">Last done</th>
+              <th scope="col">Cost</th>
+              <th scope="col">Status</th>
+              <th scope="col"><span class="visually-hidden">Actions</span></th>
             </tr>
           </thead>
           <tbody id="task-tbody"></tbody>
         </table>
       </div>
-      <p class="empty-note" id="task-empty" hidden>No responsibilities match. Try clearing the filters, or add one with the button up top.</p>
+      <p class="empty-note" id="task-empty" hidden>No responsibilities match those filters.</p>
     </section>
 
     <!-- ============ VENDORS ============ -->
-    <section id="view-vendors" class="view" hidden>
+    <section id="view-vendors" class="view" aria-label="Vendors" hidden>
       <div class="section-head">
-        <p class="section-desc">Contact information for the companies the building works with, plus their contracts and documents.</p>
-        <button class="btn btn-primary" id="btn-new-vendor">+ Add vendor</button>
+        <p class="section-desc">Companies the building works with, plus contracts and documents.</p>
+        <button class="btn btn-primary" id="btn-new-vendor">Add vendor</button>
       </div>
-      <div class="vendor-grid" id="vendor-grid"></div>
-      <p class="empty-note" id="vendor-empty" hidden>No vendors yet. Add the building's plumber, elevator company, insurance broker&hellip;</p>
+      <h2 class="group-heading">Under contract</h2>
+      <div class="card-grid" id="vendor-grid-contracted"></div>
+      <h2 class="group-heading">Recommended</h2>
+      <div class="card-grid" id="vendor-grid-recommended"></div>
+      <p class="empty-note" id="vendor-empty" hidden>No vendors yet.</p>
+    </section>
+
+    <!-- ============ ACCOUNTS ============ -->
+    <section id="view-accounts" class="view" aria-label="Accounts" hidden>
+      <div class="section-head">
+        <p class="section-desc">
+          Building accounts and city portals. Passwords are deliberately not stored here.
+          Keep them in the board password manager.
+        </p>
+        <button class="btn btn-primary" id="btn-new-account">Add account</button>
+      </div>
+      <div class="card-grid" id="account-grid"></div>
+      <p class="empty-note" id="account-empty" hidden>No accounts yet.</p>
     </section>
 
     <!-- ============ BOARD ============ -->
-    <section id="view-board" class="view" hidden>
+    <section id="view-board" class="view" aria-label="Board members" hidden>
       <div class="section-head">
-        <p class="section-desc">Board members. Assign responsibilities to them, and reminder emails go to the address listed here.</p>
-        <button class="btn btn-primary" id="btn-new-member">+ Add member</button>
+        <p class="section-desc">Board members. Reminder emails go to the addresses listed here.</p>
+        <button class="btn btn-primary" id="btn-new-member">Add member</button>
       </div>
-      <div class="member-grid" id="member-grid"></div>
-      <p class="empty-note" id="member-empty" hidden>No board members yet. Add yourself first!</p>
+      <div class="card-grid" id="member-grid"></div>
+      <p class="empty-note" id="member-empty" hidden>No board members yet.</p>
     </section>
   </main>
 
   <!-- ============ TASK MODAL ============ -->
-  <div class="modal-backdrop" id="task-modal" hidden>
+  <div class="modal-backdrop" id="task-modal" role="dialog" aria-modal="true" aria-labelledby="task-modal-title" hidden>
     <div class="modal">
       <div class="modal-head">
-        <h3 id="task-modal-title">New responsibility</h3>
-        <button class="btn-icon" data-close="task-modal">&times;</button>
+        <h2 id="task-modal-title">New responsibility</h2>
+        <button class="btn-close" data-close="task-modal" aria-label="Close">Close</button>
       </div>
       <form id="task-form" class="modal-body">
         <input type="hidden" id="tf-id">
         <label class="field">
-          <span>Title *</span>
-          <input class="input" id="tf-title" required placeholder="e.g. Renew building insurance">
+          <span>Title <span class="req">(required)</span></span>
+          <input class="input" id="tf-title" required>
         </label>
         <label class="field">
           <span>Details</span>
-          <textarea class="input" id="tf-desc" rows="3" placeholder="What needs to happen, account numbers, past history&hellip;"></textarea>
+          <textarea class="input" id="tf-desc" rows="3"></textarea>
         </label>
         <div class="field-row">
           <label class="field">
@@ -168,12 +228,25 @@
           <label class="field">
             <span>Repeats</span>
             <select class="input" id="tf-recurrence">
-              <option value="none">Doesn't repeat</option>
+              <option value="none">Does not repeat</option>
               <option value="monthly">Monthly</option>
               <option value="quarterly">Quarterly</option>
               <option value="semiannual">Every 6 months</option>
               <option value="annual">Yearly</option>
+              <option value="biennial">Every 2 years</option>
+              <option value="three_year">Every 3 years</option>
+              <option value="five_year">Every 5 years</option>
             </select>
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Last done</span>
+            <input class="input" type="date" id="tf-lastdone">
+          </label>
+          <label class="field">
+            <span>Estimated cost</span>
+            <input class="input" type="number" step="0.01" min="0" id="tf-cost">
           </label>
         </div>
         <div class="field-row">
@@ -195,18 +268,27 @@
           </select>
         </label>
         <fieldset class="links-fieldset">
-          <legend>Links &amp; documents</legend>
+          <legend>Links and documents</legend>
           <div id="tf-links"></div>
           <div class="link-add">
-            <input class="input" id="tf-link-title" placeholder="Label (e.g. Contract PDF)">
-            <input class="input" id="tf-link-url" placeholder="https://&hellip;">
-            <select class="input" id="tf-link-kind">
-              <option value="link">Link</option>
-              <option value="contract">Contract</option>
-              <option value="document">Document</option>
-              <option value="website">Website</option>
-            </select>
-            <button type="button" class="btn" id="tf-link-add">Add</button>
+            <label class="field">
+              <span class="visually-hidden">Link label</span>
+              <input class="input" id="tf-link-title" placeholder="Label">
+            </label>
+            <label class="field">
+              <span class="visually-hidden">Link address</span>
+              <input class="input" id="tf-link-url" placeholder="https://">
+            </label>
+            <label class="field">
+              <span class="visually-hidden">Link type</span>
+              <select class="input" id="tf-link-kind">
+                <option value="link">Link</option>
+                <option value="contract">Contract</option>
+                <option value="document">Document</option>
+                <option value="website">Website</option>
+              </select>
+            </label>
+            <button type="button" class="btn" id="tf-link-add">Add link</button>
           </div>
         </fieldset>
         <div class="modal-actions">
@@ -220,61 +302,88 @@
   </div>
 
   <!-- ============ VENDOR MODAL ============ -->
-  <div class="modal-backdrop" id="vendor-modal" hidden>
+  <div class="modal-backdrop" id="vendor-modal" role="dialog" aria-modal="true" aria-labelledby="vendor-modal-title" hidden>
     <div class="modal">
       <div class="modal-head">
-        <h3 id="vendor-modal-title">Add vendor</h3>
-        <button class="btn-icon" data-close="vendor-modal">&times;</button>
+        <h2 id="vendor-modal-title">Add vendor</h2>
+        <button class="btn-close" data-close="vendor-modal" aria-label="Close">Close</button>
       </div>
       <form id="vendor-form" class="modal-body">
         <input type="hidden" id="vf-id">
         <div class="field-row">
           <label class="field">
-            <span>Company *</span>
-            <input class="input" id="vf-name" required placeholder="e.g. Acme Elevator Co.">
+            <span>Company <span class="req">(required)</span></span>
+            <input class="input" id="vf-name" required>
           </label>
           <label class="field">
             <span>Service</span>
-            <input class="input" id="vf-service" placeholder="e.g. Elevator maintenance">
+            <input class="input" id="vf-service">
           </label>
         </div>
         <div class="field-row">
+          <label class="field">
+            <span>Relationship</span>
+            <select class="input" id="vf-status">
+              <option value="contracted">Under contract</option>
+              <option value="recommended">Recommended</option>
+              <option value="past">No longer used</option>
+            </select>
+          </label>
           <label class="field">
             <span>Contact person</span>
             <input class="input" id="vf-contact">
           </label>
+        </div>
+        <div class="field-row">
           <label class="field">
-            <span>Phone</span>
-            <input class="input" id="vf-phone" type="tel">
+            <span>Cost</span>
+            <input class="input" type="number" step="0.01" min="0" id="vf-cost">
+          </label>
+          <label class="field">
+            <span>Cost period</span>
+            <input class="input" id="vf-costperiod" placeholder="monthly, annual, 3-year">
           </label>
         </div>
         <div class="field-row">
           <label class="field">
+            <span>Phone</span>
+            <input class="input" id="vf-phone" type="tel">
+          </label>
+          <label class="field">
             <span>Email</span>
             <input class="input" id="vf-email" type="email">
           </label>
-          <label class="field">
-            <span>Website</span>
-            <input class="input" id="vf-website" placeholder="https://&hellip;">
-          </label>
         </div>
         <label class="field">
+          <span>Website</span>
+          <input class="input" id="vf-website" placeholder="https://">
+        </label>
+        <label class="field">
           <span>Notes</span>
-          <textarea class="input" id="vf-notes" rows="2" placeholder="Account number, after-hours line, contract terms&hellip;"></textarea>
+          <textarea class="input" id="vf-notes" rows="3"></textarea>
         </label>
         <fieldset class="links-fieldset">
-          <legend>Contracts &amp; documents</legend>
+          <legend>Contracts and documents</legend>
           <div id="vf-links"></div>
           <div class="link-add">
-            <input class="input" id="vf-link-title" placeholder="Label">
-            <input class="input" id="vf-link-url" placeholder="https://&hellip;">
-            <select class="input" id="vf-link-kind">
-              <option value="contract">Contract</option>
-              <option value="document">Document</option>
-              <option value="website">Website</option>
-              <option value="link">Link</option>
-            </select>
-            <button type="button" class="btn" id="vf-link-add">Add</button>
+            <label class="field">
+              <span class="visually-hidden">Link label</span>
+              <input class="input" id="vf-link-title" placeholder="Label">
+            </label>
+            <label class="field">
+              <span class="visually-hidden">Link address</span>
+              <input class="input" id="vf-link-url" placeholder="https://">
+            </label>
+            <label class="field">
+              <span class="visually-hidden">Link type</span>
+              <select class="input" id="vf-link-kind">
+                <option value="contract">Contract</option>
+                <option value="document">Document</option>
+                <option value="website">Website</option>
+                <option value="link">Link</option>
+              </select>
+            </label>
+            <button type="button" class="btn" id="vf-link-add">Add link</button>
           </div>
         </fieldset>
         <div class="modal-actions">
@@ -287,25 +396,82 @@
     </div>
   </div>
 
+  <!-- ============ ACCOUNT MODAL ============ -->
+  <div class="modal-backdrop" id="account-modal" role="dialog" aria-modal="true" aria-labelledby="account-modal-title" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="account-modal-title">Add account</h2>
+        <button class="btn-close" data-close="account-modal" aria-label="Close">Close</button>
+      </div>
+      <form id="account-form" class="modal-body">
+        <input type="hidden" id="af-id">
+        <div class="field-row">
+          <label class="field">
+            <span>Account name <span class="req">(required)</span></span>
+            <input class="input" id="af-name" required>
+          </label>
+          <label class="field">
+            <span>Category</span>
+            <input class="input" id="af-category" placeholder="Utilities, City portal">
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Account number</span>
+            <input class="input" id="af-number">
+          </label>
+          <label class="field">
+            <span>Username</span>
+            <input class="input" id="af-username">
+          </label>
+        </div>
+        <label class="field">
+          <span>Portal address</span>
+          <input class="input" id="af-url" placeholder="https://">
+        </label>
+        <label class="field">
+          <span>Notes</span>
+          <textarea class="input" id="af-notes" rows="3"></textarea>
+        </label>
+        <p class="inline-note">
+          Do not put passwords here. Anyone who has the site address can read this database.
+          Keep passwords in the board password manager.
+        </p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-danger" id="af-delete" hidden>Delete</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn" data-close="account-modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- ============ MEMBER MODAL ============ -->
-  <div class="modal-backdrop" id="member-modal" hidden>
+  <div class="modal-backdrop" id="member-modal" role="dialog" aria-modal="true" aria-labelledby="member-modal-title" hidden>
     <div class="modal modal-sm">
       <div class="modal-head">
-        <h3 id="member-modal-title">Add board member</h3>
-        <button class="btn-icon" data-close="member-modal">&times;</button>
+        <h2 id="member-modal-title">Add board member</h2>
+        <button class="btn-close" data-close="member-modal" aria-label="Close">Close</button>
       </div>
       <form id="member-form" class="modal-body">
         <input type="hidden" id="mf-id">
         <label class="field">
-          <span>Name *</span>
+          <span>Name <span class="req">(required)</span></span>
           <input class="input" id="mf-name" required>
         </label>
+        <div class="field-row">
+          <label class="field">
+            <span>Position</span>
+            <input class="input" id="mf-position" placeholder="President, Treasurer">
+          </label>
+          <label class="field">
+            <span>Apartment</span>
+            <input class="input" id="mf-apartment">
+          </label>
+        </div>
         <label class="field">
-          <span>Position</span>
-          <input class="input" id="mf-position" placeholder="e.g. President, Treasurer, Secretary">
-        </label>
-        <label class="field">
-          <span>Email <small>(reminder emails go here)</small></span>
+          <span>Email <span class="hint">(reminder emails go here)</span></span>
           <input class="input" id="mf-email" type="email">
         </label>
         <label class="field">
@@ -322,7 +488,7 @@
     </div>
   </div>
 
-  <div class="toast" id="toast" hidden></div>
+  <div class="toast" id="toast" role="status" hidden></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="config.js"></script>

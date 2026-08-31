@@ -1,4 +1,4 @@
-// Condo Board configuration.
+// 372 12th board tracker configuration.
 //
 // 1. Create a free project at https://supabase.com
 // 2. In the Supabase dashboard: Project Settings -> API
@@ -10,11 +10,11 @@
 window.CONDOBOARD_CONFIG = {
   SUPABASE_URL: "https://wnmvehzatnclhogihlnx.supabase.co",       // e.g. "https://abcdefgh.supabase.co"
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndubXZlaHphdG5jbGhvZ2lobG54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNDQ3ODMsImV4cCI6MjEwMzcyMDc4M30.H_sdBIfaOiF5V0IdCl_e_nB2i1rH_TTHBAXIsil54As",  // the long "anon public" key
-  BUILDING_NAME: "Condo Board",  // shown in the header
+  BUILDING_NAME: "372 12th",  // shown in the header
 
   // Password screen shown before the app loads. Set to "" to turn it off.
   // Note: this keeps casual visitors out if the link gets shared around, but
-  // it is not real security — the password is readable in this file, which
-  // the browser downloads. See "Security" in README.md.
+  // but it is not real security. The password is readable in this file,
+  // which the browser downloads. See the Security section of README.md.
   SITE_PASSWORD: "essex",
 };

@@ -18,10 +18,10 @@ select cron.schedule(
   '0 13 * * *',
   $$
   select net.http_post(
-    url     := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/send-reminders',
+    url     := 'https://wnmvehzatnclhogihlnx.supabase.co/functions/v1/send-reminders',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer YOUR_ANON_KEY'
+      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndubXZlaHphdG5jbGhvZ2lobG54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNDQ3ODMsImV4cCI6MjEwMzcyMDc4M30.H_sdBIfaOiF5V0IdCl_e_nB2i1rH_TTHBAXIsil54As'
     ),
     body    := '{}'::jsonb
   );
