@@ -18,6 +18,12 @@ replies in chat:
   a hyphen used as punctuation. Hyphenated words such as "five-year",
   "bed-bug" and "self hosted where hyphenated" are fine. Rewrite into two
   sentences or use a comma instead.
+* **Do not be wordy.** This is a standing rule for the interface. Include a
+  sentence only when the information is not obvious from the screen and not
+  readily attainable. No section descriptions restating the tab name, no
+  hints explaining a visible control, no notes justifying a design choice.
+  Evan removed a batch of these on 2026-08-31. Do not reintroduce them, and
+  do not add new ones when building a feature.
 * **Accessibility is a requirement, not a polish pass.** Large touch targets,
   strong contrast, one consistent palette. See the Accessibility section of
   README.md for the specific commitments the CSS makes, and keep them true.
@@ -127,6 +133,18 @@ email and is the only free option, because Resend's `onboarding@resend.dev`
 sender only delivers to the Resend account owner's own address. Per person
 mode needs a verified domain, roughly $12 a year. Evan is on digest mode to
 37212th@gmail.com, which forwards to the whole board.
+
+The Settings tab is deliberately tiny: a Monthly or Never radio, the day of
+the month when Monthly is chosen, one line naming the recipient, and three
+buttons. Monthly maps to `reminders_enabled = true`, Never to false.
+`delivery_mode` and `digest_email` are no longer editable on the site and are
+set by migration. Evan asked for the recipient control to come back later.
+
+A browser fetch to the function that fails outright is almost always CORS,
+which in practice means the deployed build predates the CORS headers. That
+happened on 2026-08-31 and the error text now says exactly that. When
+changing the function, remember it must be redeployed before the site can
+use the new behaviour.
 
 ## Mobile navigation
 

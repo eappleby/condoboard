@@ -52,8 +52,7 @@ sample data and nothing is saved.
 * **Board.** Members with position, apartment, email and phone.
 * **Schedules.** Rotating duties such as the trash and recycling roster.
   Give a row its months and the site marks whose turn it is right now.
-* **Settings.** Turn the email on or off, choose the day it goes out, and
-  preview it, without touching any code.
+* **Settings.** Monthly or Never, the day it goes out, and a preview.
 * **Monthly summary email.** Off until you switch it on. It has three parts:
   anything overdue in full, the month ahead in full with who is responsible,
   vendor contacts, documents and costs, then the month after that as a short
@@ -173,14 +172,21 @@ the building address is the free path.
 3. Edit `supabase/reminders-cron.sql`, replace the project ref and anon key
    placeholders, and run it in the SQL Editor. The job fires daily at 13:00
    UTC, which is 9 AM Eastern.
-4. Open the Settings tab, set the address and the day of the month, then
-   press **Preview the email**. It builds the real email from live data and
-   shows it exactly as it will arrive, without sending anything. When it
-   looks right, tick "Send reminder emails" and save.
+4. Open the Settings tab and press **Preview the email**. It builds the real
+   email from live data and shows it exactly as it will arrive, without
+   sending anything. When it looks right, choose Monthly, set the day, and
+   save.
+
+The recipient is set by migration rather than on the site. To change it, run
+`update reminder_settings set digest_email = '...' where id = 1;`.
 
 **Preview the email** never sends. **Send it now** does, immediately,
-ignoring both the schedule and the on and off switch. It is the only control
-on the page that delivers real mail while reminders are off.
+ignoring the schedule. It is the only control that delivers real mail while
+delivery is set to Never.
+
+Changing the function means redeploying it. The site calls the function
+directly from the browser, so a build without the CORS headers will fail with
+"Failed to fetch" even though the function is live.
 
 ### Which months the email covers
 

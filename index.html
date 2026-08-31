@@ -159,7 +159,6 @@
     <!-- ============ VENDORS ============ -->
     <section id="view-vendors" class="view" aria-label="Vendors" hidden>
       <div class="section-head">
-        <p class="section-desc">Companies the building works with, plus contracts and documents.</p>
         <button class="btn btn-primary" id="btn-new-vendor">Add vendor</button>
       </div>
       <h2 class="group-heading">Under contract</h2>
@@ -172,10 +171,6 @@
     <!-- ============ ACCOUNTS ============ -->
     <section id="view-accounts" class="view" aria-label="Accounts" hidden>
       <div class="section-head">
-        <p class="section-desc">
-          Building accounts and city portals. Passwords are deliberately not stored here.
-          Keep them in the board password manager.
-        </p>
         <button class="btn btn-primary" id="btn-new-account">Add account</button>
       </div>
       <div class="card-grid" id="account-grid"></div>
@@ -185,7 +180,6 @@
     <!-- ============ BOARD ============ -->
     <section id="view-board" class="view" aria-label="Board members" hidden>
       <div class="section-head">
-        <p class="section-desc">Board members. Reminder emails go to the addresses listed here.</p>
         <button class="btn btn-primary" id="btn-new-member">Add member</button>
       </div>
       <div class="card-grid" id="member-grid"></div>
@@ -195,7 +189,6 @@
     <!-- ============ SCHEDULES ============ -->
     <section id="view-schedules" class="view" aria-label="Schedules" hidden>
       <div class="section-head">
-        <p class="section-desc">Rotating duties, such as who takes the bins out. Whoever is up right now is marked.</p>
         <button class="btn btn-primary" id="btn-new-schedule">Add schedule</button>
       </div>
       <div id="schedule-list"></div>
@@ -204,97 +197,34 @@
 
     <!-- ============ SETTINGS ============ -->
     <section id="view-settings" class="view" aria-label="Settings" hidden>
-      <h2 class="page-heading">Reminder emails</h2>
-
-      <div class="settings-status" id="settings-status">
-        <p class="settings-summary" id="settings-summary">Loading settings.</p>
-      </div>
-
       <form id="settings-form" class="settings-form">
         <fieldset class="settings-block">
-          <legend>Turn reminders on or off</legend>
-          <label class="switch-row">
-            <input type="checkbox" id="sf-enabled">
-            <span><strong>Send reminder emails</strong><br>
-              <span class="hint">While this is off, nothing is ever emailed, even though the
-              daily job keeps running. Turn it on when the board is ready.</span></span>
-          </label>
-        </fieldset>
-
-        <fieldset class="settings-block">
-          <legend>How often</legend>
-          <div class="field-row">
-            <label class="field">
-              <span>Frequency</span>
-              <select class="input" id="sf-frequency">
-                <option value="daily">Every day</option>
-                <option value="weekdays">Every weekday</option>
-                <option value="weekly">Once a week</option>
-                <option value="monthly">Once a month</option>
-              </select>
+          <legend>Email delivery</legend>
+          <div class="radio-set" role="radiogroup" aria-label="Email delivery">
+            <label class="radio-row">
+              <input type="radio" name="sf-cadence" id="sf-monthly" value="monthly">
+              <span>Monthly</span>
             </label>
-            <label class="field" id="sf-weekday-field">
-              <span>Day of the week</span>
-              <select class="input" id="sf-weekday">
-                <option value="0">Sunday</option>
-                <option value="1">Monday</option>
-                <option value="2">Tuesday</option>
-                <option value="3">Wednesday</option>
-                <option value="4">Thursday</option>
-                <option value="5">Friday</option>
-                <option value="6">Saturday</option>
-              </select>
-            </label>
-            <label class="field" id="sf-monthday-field">
-              <span>Day of the month</span>
-              <input class="input" type="number" min="1" max="28" id="sf-monthday">
+            <label class="radio-row">
+              <input type="radio" name="sf-cadence" id="sf-never" value="never" checked>
+              <span>Never</span>
             </label>
           </div>
-          <p class="hint">Emails go out at about 9 AM Eastern on a sending day.</p>
-        </fieldset>
-
-        <fieldset class="settings-block">
-          <legend>What goes in the email</legend>
-          <p class="hint">The summary always has three parts. Anything overdue, in full.
-            The month ahead, in full, with who is responsible, vendor contacts, documents
-            and costs. Then the month after that, as a short list of names and who has them.</p>
-          <p class="hint">Sent on or before the 20th, the detailed month is the current one.
-            From the 21st it is the next month, which suits a board sending near month end.
-            The email always names the months it covers.</p>
-        </fieldset>
-
-        <fieldset class="settings-block">
-          <legend>Who receives it</legend>
-          <label class="field">
-            <span>Delivery</span>
-            <select class="input" id="sf-mode">
-              <option value="digest">One email to a single address</option>
-              <option value="per_person">Each member gets only their own items</option>
-            </select>
+          <label class="field" id="sf-monthday-field">
+            <span>Day of the month</span>
+            <input class="input" type="number" min="1" max="28" id="sf-monthday">
           </label>
-          <label class="field" id="sf-digest-field">
-            <span>Send to</span>
-            <input class="input" type="email" id="sf-digest" placeholder="37212th@gmail.com">
-          </label>
-          <p class="inline-note" id="sf-mode-note"></p>
+          <p class="hint" id="sf-recipient-line"></p>
         </fieldset>
 
         <div class="settings-actions">
-          <button type="submit" class="btn btn-primary">Save settings</button>
+          <button type="submit" class="btn btn-primary">Save</button>
           <button type="button" class="btn" id="sf-preview">Preview the email</button>
           <button type="button" class="btn" id="sf-test">Send it now</button>
         </div>
       </form>
-
-      <div class="preview-box" id="sf-preview-box" hidden>
-        <div class="preview-head">
-          <h3 id="sf-preview-title">Preview</h3>
-          <button type="button" class="btn-close" id="sf-preview-close">Close</button>
-        </div>
-        <div id="sf-preview-body"></div>
-        <iframe id="sf-preview-frame" class="preview-frame" title="Email preview" sandbox="" hidden></iframe>
-      </div>
     </section>
+
   </main>
 
   <!-- ============ TASK MODAL ============ -->
@@ -377,7 +307,6 @@
         </label>
         <fieldset class="links-fieldset">
           <legend>Documents</legend>
-          <p class="hint">Drag a row by its handle to reorder, or use the up and down buttons.</p>
           <div id="tf-links"></div>
           <button type="button" class="btn" id="tf-link-add">Add a document</button>
         </fieldset>
@@ -454,7 +383,6 @@
         </label>
         <fieldset class="links-fieldset">
           <legend>Documents</legend>
-          <p class="hint">Drag a row by its handle to reorder, or use the up and down buttons.</p>
           <div id="vf-links"></div>
           <button type="button" class="btn" id="vf-link-add">Add a document</button>
         </fieldset>
@@ -507,14 +435,9 @@
         </label>
         <fieldset class="links-fieldset">
           <legend>Documents</legend>
-          <p class="hint">Drag a row by its handle to reorder, or use the up and down buttons.</p>
           <div id="af-links"></div>
           <button type="button" class="btn" id="af-link-add">Add a document</button>
         </fieldset>
-        <p class="inline-note">
-          Do not put passwords here. Anyone who has the site address can read this database.
-          Keep passwords in the board password manager.
-        </p>
         <div class="modal-actions">
           <button type="button" class="btn btn-danger" id="af-delete" hidden>Delete</button>
           <span class="spacer"></span>
@@ -544,8 +467,6 @@
         </label>
         <fieldset class="links-fieldset">
           <legend>Rotation</legend>
-          <p class="hint">Drag a row by its handle to reorder, or use the up and down buttons.
-            Months are optional and let the site mark whose turn it is now.</p>
           <div id="cf-slots"></div>
           <button type="button" class="btn" id="cf-slot-add">Add a row</button>
         </fieldset>
@@ -597,6 +518,20 @@
           <button type="submit" class="btn btn-primary">Save</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ============ EMAIL PREVIEW MODAL ============ -->
+  <div class="modal-backdrop" id="preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-modal-title" hidden>
+    <div class="modal modal-lg">
+      <div class="modal-head">
+        <h2 id="preview-modal-title">Email preview</h2>
+        <button class="btn-close" data-close="preview-modal" aria-label="Close">Close</button>
+      </div>
+      <div class="modal-body">
+        <div id="sf-preview-body"></div>
+        <iframe id="sf-preview-frame" class="preview-frame" title="Email preview" sandbox="" hidden></iframe>
+      </div>
     </div>
   </div>
 

@@ -61,7 +61,7 @@
       { id: uid(), title: "Sample document", url: "https://example.com", kind: "document", responsibility_id: tasks[0].id, vendor_id: null, account_id: null },
     ];
     const settings = { id: 1, reminders_enabled: false, frequency: "monthly", send_weekday: 1,
-      send_day_of_month: 1, delivery_mode: "digest", digest_email: null, last_sent_at: null };
+      send_day_of_month: 1, delivery_mode: "digest", digest_email: "board@example.com", last_sent_at: null };
     const schedules = [{ id: uid(), name: "Trash and recycling", description: "Sample rotation.", position: 0 }];
     const scheduleSlots = [1, 3, 5, 7, 9, 11].map((mo, i) => ({
       id: uid(), schedule_id: schedules[0].id,
@@ -1101,91 +1101,59 @@
   };
   const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-  function describeSchedule(s) {
-    if (!s.reminders_enabled) {
-      return "Reminder emails are off. Nothing will be sent to anyone.";
-    }
-    const when = s.frequency === "daily" ? "every day"
-      : s.frequency === "weekdays" ? "every weekday"
-      : s.frequency === "weekly" ? "every " + WEEKDAYS[s.send_weekday]
-      : "on day " + s.send_day_of_month + " of each month";
-    const who = s.delivery_mode === "digest"
-      ? "one email to " + (s.digest_email || "an address you still need to set")
-      : "each board member their own items";
-    return "Sending " + who + ", " + when + " at about 9 AM Eastern.";
-  }
-
   function settingsFromForm() {
+    const monthly = $("sf-monthly").checked;
     return {
-      reminders_enabled: $("sf-enabled").checked,
-      frequency: $("sf-frequency").value,
-      send_weekday: Number($("sf-weekday").value),
+      reminders_enabled: monthly,
+      frequency: "monthly",
       send_day_of_month: Number($("sf-monthday").value) || 1,
-      delivery_mode: $("sf-mode").value,
-      digest_email: $("sf-digest").value.trim() || null,
     };
   }
 
   function renderSettings() {
     const s = S.settings || DEFAULT_SETTINGS;
-    $("sf-enabled").checked = !!s.reminders_enabled;
-    $("sf-frequency").value = s.frequency;
-    $("sf-weekday").value = String(s.send_weekday);
-    $("sf-monthday").value = s.send_day_of_month;
-    $("sf-mode").value = s.delivery_mode;
-    $("sf-digest").value = s.digest_email || "";
+    $("sf-monthly").checked = !!s.reminders_enabled;
+    $("sf-never").checked = !s.reminders_enabled;
+    $("sf-monthday").value = s.send_day_of_month || 1;
     refreshSettingsVisibility();
   }
 
-  // Show only the fields that matter for the current choices, and keep the
-  // summary line at the top honest about what will happen.
   function refreshSettingsVisibility() {
-    const live = Object.assign({}, S.settings, settingsFromForm());
-    $("sf-weekday-field").hidden = live.frequency !== "weekly";
-    $("sf-monthday-field").hidden = live.frequency !== "monthly";
-    $("sf-digest-field").hidden = live.delivery_mode !== "digest";
-    $("sf-mode-note").textContent = live.delivery_mode === "digest"
-      ? "This works on the free Resend plan, as long as the address above is the one the Resend account was created with."
-      : "This needs a domain you own, verified in Resend. Without one, Resend will refuse to deliver to anyone but your own account address.";
-    $("settings-summary").textContent = describeSchedule(live);
-    $("settings-status").className = "settings-status " + (live.reminders_enabled ? "is-on" : "is-off");
-    $("sf-test").disabled = live.delivery_mode === "digest" && !live.digest_email;
+    const monthly = $("sf-monthly").checked;
+    $("sf-monthday-field").hidden = !monthly;
+    const to = (S.settings && S.settings.digest_email) || "";
+    $("sf-recipient-line").innerHTML = monthly
+      ? (to ? "Emails go to <b>" + esc(to) + "</b> at 9AM EST."
+            : "No recipient is set yet.")
+      : "";
+    $("sf-test").disabled = !to;
   }
 
-  ["sf-enabled", "sf-frequency", "sf-weekday", "sf-monthday",
-   "sf-mode", "sf-digest"].forEach((id) =>
-    $(id).addEventListener("input", refreshSettingsVisibility));
+  ["sf-monthly", "sf-never", "sf-monthday"].forEach((id) =>
+    $(id).addEventListener("change", refreshSettingsVisibility));
 
   $("settings-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const row = settingsFromForm();
-    if (row.reminders_enabled && row.delivery_mode === "digest" && !row.digest_email) {
-      toast("Add an address to send the digest to, or turn reminders off.", true);
-      $("sf-digest").focus();
-      return;
-    }
     try {
       const patch = await getStore().update("settings", 1, row);
       Object.assign(S.settings, patch || row);
       renderSettings();
-      toast(row.reminders_enabled ? "Settings saved. Reminders are on." : "Settings saved. Reminders stay off.");
+      toast(row.reminders_enabled ? "Saved. Monthly email is on." : "Saved. No emails will be sent.");
     } catch (err) { fail(err); }
   });
 
-  // Calls the Edge Function. Preview builds the email and shows it exactly as
-  // it will arrive. Send now delivers it, ignoring the schedule and the on
-  // and off switch.
+  // Calls the Edge Function. Preview shows the real email in a dialog and
+  // never sends. Send now delivers immediately.
   async function callReminderFunction(mode) {
-    const box = $("sf-preview-box");
     const body = $("sf-preview-body");
     const frame = $("sf-preview-frame");
-    box.hidden = false;
     frame.hidden = true;
-    $("sf-preview-title").textContent = mode === "dry" ? "Email preview" : "Sending";
+    $("preview-modal-title").textContent = mode === "dry" ? "Email preview" : "Sending";
+    openModal("preview-modal");
 
     if (demoMode) {
-      body.innerHTML = '<p class="muted">This needs the live database. ' +
-        "Connect Supabase in config.js and the preview will build the real email.</p>";
+      body.innerHTML = '<p class="muted">Connect Supabase to build the real email.</p>';
       return;
     }
     body.innerHTML = '<p class="muted">Working.</p>';
@@ -1201,50 +1169,45 @@
       });
       const data = await resp.json();
       if (data.error) {
-        body.innerHTML = '<p class="muted">The function returned an error: ' + esc(String(data.error)) +
-          "</p><p class=\"muted\">If it mentions RESEND_API_KEY, that secret is not set yet. " +
-          "The preview works without it, but sending does not. See the README.</p>";
+        body.innerHTML = '<p class="muted">The function returned an error: ' + esc(String(data.error)) + "</p>";
         return;
       }
       if (mode === "dry") {
+        if (!data.preview) {
+          body.innerHTML = '<p class="muted">The deployed function is an older version. ' +
+            "Run <code>supabase functions deploy send-reminders</code> and try again.</p>";
+          return;
+        }
         const to = (data.recipients || []).map((r) => r.to).join(", ");
-        const c = data.counts || {};
         body.innerHTML =
-          "<p><strong>To:</strong> " + esc(to || "nobody, no address is set") + "<br>" +
-          "<strong>Subject:</strong> " + esc(data.subject || "") + "<br>" +
-          "<strong>Covering:</strong> " + esc(data.months || "") + "</p>" +
-          "<p class=\"muted\">" + (c.overdue || 0) + " overdue, " + (c.ahead || 0) +
-          " in the detailed month, " + (c.after || 0) + " in the short list. Nothing has been sent.</p>";
-        // srcdoc with an empty sandbox renders the email without running anything.
-        frame.srcdoc = data.html || "<p>Nothing to show.</p>";
+          "<p><b>To:</b> " + esc(to || "nobody") + "<br><b>Subject:</b> " + esc(data.subject || "") + "</p>";
+        frame.srcdoc = data.html || "";
         frame.hidden = false;
       } else {
         const sent = data.sent || 0;
         body.innerHTML = sent
-          ? "<p>Sent " + sent + " " + (sent === 1 ? "email" : "emails") + ". Check the inbox.</p>"
-          : "<p>Nothing was sent. " + esc(data.skipped || data.error || "No recipient is set.") + "</p>";
+          ? "<p>Sent to " + esc((data.results || []).map((r) => r.to).join(", ")) + ".</p>"
+          : "<p>Nothing sent. " + esc(data.skipped || "No recipient is set.") + "</p>";
         if (sent) {
-          // S.settings can be missing if the initial load failed, so guard it.
           if (S.settings) S.settings.last_sent_at = new Date().toISOString();
           toast("Email sent.");
         }
       }
     } catch (err) {
-      body.innerHTML = '<p class="muted">Could not reach the function. It may not be deployed yet. Error: ' +
-        esc(err.message) + "</p>";
+      // A browser fetch that fails outright is nearly always CORS, which here
+      // means the deployed function predates the headers that allow the site
+      // to call it.
+      body.innerHTML = '<p class="muted">Could not reach the function. If it is deployed, it is ' +
+        "probably an older build without the headers that let this page call it. " +
+        "Run <code>supabase functions deploy send-reminders</code> and try again.</p>" +
+        '<p class="muted">Error: ' + esc(err.message) + "</p>";
     }
   }
 
-  $("sf-preview-close").addEventListener("click", () => {
-    $("sf-preview-box").hidden = true;
-    $("sf-preview").focus();
-  });
-
   $("sf-preview").addEventListener("click", () => callReminderFunction("dry"));
   $("sf-test").addEventListener("click", () => {
-    const to = $("sf-digest").value.trim() || "the address on file";
-    if (!confirm("Send the summary to " + to + " right now? This ignores the schedule and " +
-                 "the on and off switch, and delivers a real email.")) return;
+    const to = (S.settings && S.settings.digest_email) || "the address on file";
+    if (!confirm("Send the summary to " + to + " now?")) return;
     callReminderFunction("force");
   });
 
@@ -1381,11 +1344,7 @@
       renderAll();
     } catch (e) {
       fail(e);
-      // Keep the settings form consistent rather than stuck on its loading text.
       renderSettings();
-      $("settings-summary").textContent =
-        "Could not load the saved settings, so this form is showing defaults. Do not save until the page loads cleanly.";
-      $("settings-status").className = "settings-status is-off";
       $("stats").innerHTML = '<div class="stat" style="grid-column:1/-1"><div class="lbl">' +
         "Could not load the data. Check the Supabase address and key in config.js, and make sure the " +
         "migrations have been applied. See the README. Error: " + esc(e.message) + "</div></div>";
