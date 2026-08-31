@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Condo Board</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127970;</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="gate" id="gate" hidden>
+    <form class="gate-card" id="gate-form">
+      <div class="gate-icon">&#127970;</div>
+      <h1 id="gate-title">Condo Board</h1>
+      <p class="gate-sub">Enter the board password to continue.</p>
+      <input type="password" class="input" id="gate-input" autocomplete="current-password"
+             placeholder="Password" aria-label="Board password">
+      <p class="gate-err" id="gate-err" hidden>That password didn't work. Try again.</p>
+      <button type="submit" class="btn btn-primary gate-btn">Enter</button>
+      <label class="gate-remember">
+        <input type="checkbox" id="gate-remember" checked> Remember me on this device
+      </label>
+    </form>
+  </div>
+
+  <div id="demo-banner" class="demo-banner" hidden>
+    <strong>Demo mode</strong> &mdash; Supabase isn't connected yet, so you're seeing sample data and changes won't be saved. Edit <code>config.js</code> to connect your database (see README).
+  </div>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-icon">&#127970;</span>
+        <span class="brand-name" id="brand-name">Condo Board</span>
+      </div>
+      <nav class="tabs" id="tabs">
+        <button class="tab active" data-tab="dashboard">Dashboard</button>
+        <button class="tab" data-tab="tasks">Responsibilities</button>
+        <button class="tab" data-tab="vendors">Vendors</button>
+        <button class="tab" data-tab="board">Board</button>
+      </nav>
+      <button class="btn btn-primary" id="btn-new-task">+ New responsibility</button>
+      <button class="btn-icon btn-lock" id="btn-lock" title="Lock this browser" hidden>&#128274;</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- ============ DASHBOARD ============ -->
+    <section id="view-dashboard" class="view">
+      <div class="stats" id="stats"></div>
+      <div class="dash-grid">
+        <div class="dash-col">
+          <div class="dash-section" id="dash-overdue">
+            <h2><span class="dot dot-red"></span>Overdue</h2>
+            <div class="card-list" id="list-overdue"></div>
+          </div>
+          <div class="dash-section" id="dash-soon">
+            <h2><span class="dot dot-amber"></span>Due in the next 30 days</h2>
+            <div class="card-list" id="list-soon"></div>
+          </div>
+          <div class="dash-section" id="dash-later">
+            <h2><span class="dot dot-blue"></span>Coming up later</h2>
+            <div class="card-list" id="list-later"></div>
+          </div>
+        </div>
+        <div class="dash-col dash-col-side">
+          <div class="dash-section" id="dash-inprogress">
+            <h2><span class="dot dot-purple"></span>In progress</h2>
+            <div class="card-list" id="list-inprogress"></div>
+          </div>
+          <div class="dash-section" id="dash-done">
+            <h2><span class="dot dot-green"></span>Recently completed</h2>
+            <div class="card-list" id="list-done"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ RESPONSIBILITIES ============ -->
+    <section id="view-tasks" class="view" hidden>
+      <div class="filter-bar">
+        <input type="search" id="task-search" placeholder="Search responsibilities&hellip;" class="input search-input">
+        <select id="filter-status" class="input">
+          <option value="">All statuses</option>
+          <option value="open">Open</option>
+          <option value="in_progress">In progress</option>
+          <option value="done">Done</option>
+        </select>
+        <select id="filter-category" class="input"><option value="">All categories</option></select>
+        <select id="filter-assignee" class="input"><option value="">Everyone</option></select>
+      </div>
+      <div class="table-wrap">
+        <table class="table" id="task-table">
+          <thead>
+            <tr>
+              <th style="width:34%">Responsibility</th>
+              <th>Category</th>
+              <th>Assigned to</th>
+              <th>Due</th>
+              <th>Repeats</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="task-tbody"></tbody>
+        </table>
+      </div>
+      <p class="empty-note" id="task-empty" hidden>No responsibilities match. Try clearing the filters, or add one with the button up top.</p>
+    </section>
+
+    <!-- ============ VENDORS ============ -->
+    <section id="view-vendors" class="view" hidden>
+      <div class="section-head">
+        <p class="section-desc">Contact information for the companies the building works with, plus their contracts and documents.</p>
+        <button class="btn btn-primary" id="btn-new-vendor">+ Add vendor</button>
+      </div>
+      <div class="vendor-grid" id="vendor-grid"></div>
+      <p class="empty-note" id="vendor-empty" hidden>No vendors yet. Add the building's plumber, elevator company, insurance broker&hellip;</p>
+    </section>
+
+    <!-- ============ BOARD ============ -->
+    <section id="view-board" class="view" hidden>
+      <div class="section-head">
+        <p class="section-desc">Board members. Assign responsibilities to them, and reminder emails go to the address listed here.</p>
+        <button class="btn btn-primary" id="btn-new-member">+ Add member</button>
+      </div>
+      <div class="member-grid" id="member-grid"></div>
+      <p class="empty-note" id="member-empty" hidden>No board members yet. Add yourself first!</p>
+    </section>
+  </main>
+
+  <!-- ============ TASK MODAL ============ -->
+  <div class="modal-backdrop" id="task-modal" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="task-modal-title">New responsibility</h3>
+        <button class="btn-icon" data-close="task-modal">&times;</button>
+      </div>
+      <form id="task-form" class="modal-body">
+        <input type="hidden" id="tf-id">
+        <label class="field">
+          <span>Title *</span>
+          <input class="input" id="tf-title" required placeholder="e.g. Renew building insurance">
+        </label>
+        <label class="field">
+          <span>Details</span>
+          <textarea class="input" id="tf-desc" rows="3" placeholder="What needs to happen, account numbers, past history&hellip;"></textarea>
+        </label>
+        <div class="field-row">
+          <label class="field">
+            <span>Category</span>
+            <select class="input" id="tf-category"></select>
+          </label>
+          <label class="field">
+            <span>Priority</span>
+            <select class="input" id="tf-priority">
+              <option value="low">Low</option>
+              <option value="normal" selected>Normal</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Due date</span>
+            <input class="input" type="date" id="tf-due">
+          </label>
+          <label class="field">
+            <span>Repeats</span>
+            <select class="input" id="tf-recurrence">
+              <option value="none">Doesn't repeat</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="semiannual">Every 6 months</option>
+              <option value="annual">Yearly</option>
+            </select>
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Assigned to</span>
+            <select class="input" id="tf-assignee"><option value="">Unassigned</option></select>
+          </label>
+          <label class="field">
+            <span>Vendor</span>
+            <select class="input" id="tf-vendor"><option value="">None</option></select>
+          </label>
+        </div>
+        <label class="field">
+          <span>Status</span>
+          <select class="input" id="tf-status">
+            <option value="open">Open</option>
+            <option value="in_progress">In progress</option>
+            <option value="done">Done</option>
+          </select>
+        </label>
+        <fieldset class="links-fieldset">
+          <legend>Links &amp; documents</legend>
+          <div id="tf-links"></div>
+          <div class="link-add">
+            <input class="input" id="tf-link-title" placeholder="Label (e.g. Contract PDF)">
+            <input class="input" id="tf-link-url" placeholder="https://&hellip;">
+            <select class="input" id="tf-link-kind">
+              <option value="link">Link</option>
+              <option value="contract">Contract</option>
+              <option value="document">Document</option>
+              <option value="website">Website</option>
+            </select>
+            <button type="button" class="btn" id="tf-link-add">Add</button>
+          </div>
+        </fieldset>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-danger" id="tf-delete" hidden>Delete</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn" data-close="task-modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ VENDOR MODAL ============ -->
+  <div class="modal-backdrop" id="vendor-modal" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="vendor-modal-title">Add vendor</h3>
+        <button class="btn-icon" data-close="vendor-modal">&times;</button>
+      </div>
+      <form id="vendor-form" class="modal-body">
+        <input type="hidden" id="vf-id">
+        <div class="field-row">
+          <label class="field">
+            <span>Company *</span>
+            <input class="input" id="vf-name" required placeholder="e.g. Acme Elevator Co.">
+          </label>
+          <label class="field">
+            <span>Service</span>
+            <input class="input" id="vf-service" placeholder="e.g. Elevator maintenance">
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Contact person</span>
+            <input class="input" id="vf-contact">
+          </label>
+          <label class="field">
+            <span>Phone</span>
+            <input class="input" id="vf-phone" type="tel">
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Email</span>
+            <input class="input" id="vf-email" type="email">
+          </label>
+          <label class="field">
+            <span>Website</span>
+            <input class="input" id="vf-website" placeholder="https://&hellip;">
+          </label>
+        </div>
+        <label class="field">
+          <span>Notes</span>
+          <textarea class="input" id="vf-notes" rows="2" placeholder="Account number, after-hours line, contract terms&hellip;"></textarea>
+        </label>
+        <fieldset class="links-fieldset">
+          <legend>Contracts &amp; documents</legend>
+          <div id="vf-links"></div>
+          <div class="link-add">
+            <input class="input" id="vf-link-title" placeholder="Label">
+            <input class="input" id="vf-link-url" placeholder="https://&hellip;">
+            <select class="input" id="vf-link-kind">
+              <option value="contract">Contract</option>
+              <option value="document">Document</option>
+              <option value="website">Website</option>
+              <option value="link">Link</option>
+            </select>
+            <button type="button" class="btn" id="vf-link-add">Add</button>
+          </div>
+        </fieldset>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-danger" id="vf-delete" hidden>Delete</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn" data-close="vendor-modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ MEMBER MODAL ============ -->
+  <div class="modal-backdrop" id="member-modal" hidden>
+    <div class="modal modal-sm">
+      <div class="modal-head">
+        <h3 id="member-modal-title">Add board member</h3>
+        <button class="btn-icon" data-close="member-modal">&times;</button>
+      </div>
+      <form id="member-form" class="modal-body">
+        <input type="hidden" id="mf-id">
+        <label class="field">
+          <span>Name *</span>
+          <input class="input" id="mf-name" required>
+        </label>
+        <label class="field">
+          <span>Position</span>
+          <input class="input" id="mf-position" placeholder="e.g. President, Treasurer, Secretary">
+        </label>
+        <label class="field">
+          <span>Email <small>(reminder emails go here)</small></span>
+          <input class="input" id="mf-email" type="email">
+        </label>
+        <label class="field">
+          <span>Phone</span>
+          <input class="input" id="mf-phone" type="tel">
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-danger" id="mf-delete" hidden>Delete</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn" data-close="member-modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

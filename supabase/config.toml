@@ -1,0 +1,35 @@
+# Supabase CLI configuration.
+# Docs: https://supabase.com/docs/guides/local-development/cli/config
+
+project_id = "condoboard"
+
+[db]
+port = 54322
+# Match your remote project's Postgres major version (Supabase dashboard ->
+# Settings -> Infrastructure). 15 is the current default for new projects.
+major_version = 15
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+# Not used today — the site uses a shared password, not per-person accounts.
+# Left enabled so it's one flag to flip if we ever add magic-link sign-in.
+enabled = true
+site_url = "http://localhost:3000"
+
+# Declaring the function here means the GitHub integration (and
+# `supabase functions deploy`) picks it up.
+[functions.send-reminders]
+enabled = true
+# The daily pg_cron job calls this with the anon key as a Bearer token,
+# which satisfies JWT verification.
+verify_jwt = true
