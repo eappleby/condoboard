@@ -140,6 +140,13 @@ buttons. Monthly maps to `reminders_enabled = true`, Never to false.
 `delivery_mode` and `digest_email` are no longer editable on the site and are
 set by migration. Evan asked for the recipient control to come back later.
 
+**A preview must never be gated by the send checks.** The enabled flag, the
+send day and the already-sent-today guard decide whether to SEND, so `dry`
+skips all three. Getting this wrong on 2026-08-31 made Preview useless
+exactly when it was needed, before turning delivery on, and the symptom
+looked like a stale deployment. /tmp/test-gating.ts in that session pins the
+rule.
+
 A browser fetch to the function that fails outright is almost always CORS,
 which in practice means the deployed build predates the CORS headers. That
 happened on 2026-08-31 and the error text now says exactly that. When

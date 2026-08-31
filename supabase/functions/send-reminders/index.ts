@@ -312,14 +312,18 @@ if (import.meta.main) {
       const settings = row as Settings;
 
       const now = new Date();
-      if (!force) {
+
+      // These checks decide whether to SEND. A preview must build the email
+      // whatever they say, otherwise the board cannot see what an email would
+      // look like before switching delivery on.
+      if (!force && !dry) {
         if (!settings.reminders_enabled) {
-          return json({ sent: 0, skipped: "Reminders are turned off on the Settings tab.", schedule: describeSchedule(settings) });
+          return json({ sent: 0, skipped: "Delivery is set to Never on the Settings tab.", schedule: describeSchedule(settings) });
         }
         if (!isSendDay(settings, now)) {
           return json({ sent: 0, skipped: "Not a sending day for the chosen frequency.", schedule: describeSchedule(settings) });
         }
-        if (!dry && alreadySentToday(settings, now)) {
+        if (alreadySentToday(settings, now)) {
           return json({ sent: 0, skipped: "Already sent today." });
         }
       }
@@ -345,11 +349,14 @@ if (import.meta.main) {
         const digest = buildDigest(tasks, { now, appUrl });
         return json({
           preview: true,
+          enabled: settings.reminders_enabled,
           schedule: describeSchedule(settings),
           months: coveredMonths(now).aheadName + " and " + coveredMonths(now).afterName,
           counts: digest.counts,
           wouldSend: messages.length,
-          recipients: messages.map((m) => ({ to: m.to, subject: m.subject })),
+          recipients: messages.length
+            ? messages.map((m) => ({ to: m.to, subject: m.subject }))
+            : [{ to: settings.digest_email ?? "no address set", subject: digest.subject }],
           subject: messages[0]?.subject ?? digest.subject,
           html: messages[0]?.html ?? digest.html,
         });

@@ -1174,8 +1174,9 @@
       }
       if (mode === "dry") {
         if (!data.preview) {
-          body.innerHTML = '<p class="muted">The deployed function is an older version. ' +
-            "Run <code>supabase functions deploy send-reminders</code> and try again.</p>";
+          body.innerHTML = '<p class="muted">' + esc(data.skipped || "No preview came back.") +
+            " If that looks wrong, the deployed function may be out of date. " +
+            "Run <code>supabase functions deploy send-reminders</code>.</p>";
           return;
         }
         const to = (data.recipients || []).map((r) => r.to).join(", ");

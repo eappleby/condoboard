@@ -180,8 +180,8 @@ the building address is the free path.
 The recipient is set by migration rather than on the site. To change it, run
 `update reminder_settings set digest_email = '...' where id = 1;`.
 
-**Preview the email** never sends. **Send it now** does, immediately,
-ignoring the schedule. It is the only control that delivers real mail while
+**Preview the email** never sends, and works whether delivery is Monthly or
+Never. **Send it now** does send, immediately, ignoring the schedule. It is the only control that delivers real mail while
 delivery is set to Never.
 
 Changing the function means redeploying it. The site calls the function
