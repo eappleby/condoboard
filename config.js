@@ -8,8 +8,8 @@
 // (nothing is saved). See README.md for the full setup guide.
 
 window.CONDOBOARD_CONFIG = {
-  SUPABASE_URL: "",       // e.g. "https://abcdefgh.supabase.co"
-  SUPABASE_ANON_KEY: "",  // the long "anon public" key
+  SUPABASE_URL: "https://wnmvehzatnclhogihlnx.supabase.co",       // e.g. "https://abcdefgh.supabase.co"
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndubXZlaHphdG5jbGhvZ2lobG54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNDQ3ODMsImV4cCI6MjEwMzcyMDc4M30.H_sdBIfaOiF5V0IdCl_e_nB2i1rH_TTHBAXIsil54As",  // the long "anon public" key
   BUILDING_NAME: "Condo Board",  // shown in the header
 
   // Password screen shown before the app loads. Set to "" to turn it off.
