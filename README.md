@@ -50,6 +50,9 @@ sample data and nothing is saved.
 * **Accounts.** Utility accounts and city portals with account numbers,
   usernames, and links. There is no password field, on purpose.
 * **Board.** Members with position, apartment, email and phone.
+* **Fixtures.** What the building uses and what to buy when something is
+  replaced: paint colours with swatches, light fittings, hardware, the
+  intercom, appliances. Each one can carry documents.
 * **Schedules.** Rotating duties such as the trash and recycling roster.
   Give a row its months and the site marks whose turn it is right now.
 * **Settings.** Monthly or Never, the day it goes out, and a preview.
@@ -57,8 +60,8 @@ sample data and nothing is saved.
   anything overdue in full, the month ahead in full with who is responsible,
   vendor contacts, documents and costs, then the month after that as a short
   list of names and who has them.
-* **Documents.** Every responsibility, vendor and account can hold a list of
-  documents. Edit a label or address in place, drag rows to reorder them, or
+* **Documents.** Every responsibility, vendor, account and fixture can hold a
+  list of documents. Edit a label or address in place, drag rows to reorder them, or
   use the up and down buttons.
 
 ## Accessibility

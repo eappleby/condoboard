@@ -68,14 +68,20 @@
       label: MONTHS_SEED[mo - 1] + "/" + MONTHS_SEED[mo],
       responsible: "Apt " + (i + 1), month_start: mo, month_end: mo + 1, position: i,
     }));
-    return { members, vendors, tasks, links, accounts, settings, schedules, scheduleSlots };
+    const fixtures = [
+      { id: uid(), name: "Sample Paint", category: "Paint", brand: "Sample Brand", code: "123",
+        location: "Walls", url: "https://example.com", color_hex: "#E0DFD7", notes: "", position: 0 },
+      { id: uid(), name: "Sample Light", category: "Lighting", brand: "Sample Brand", code: null,
+        location: "Hallway", url: "https://example.com", color_hex: null, notes: "", position: 1 },
+    ];
+    return { members, vendors, tasks, links, accounts, settings, schedules, scheduleSlots, fixtures };
   }
 
   const TABLE = {
     members: "board_members", vendors: "vendors",
     tasks: "responsibilities", links: "links", accounts: "accounts",
     settings: "reminder_settings",
-    schedules: "schedules", scheduleSlots: "schedule_slots",
+    schedules: "schedules", scheduleSlots: "schedule_slots", fixtures: "fixtures",
   };
 
   function makeDemoStore() {
@@ -102,7 +108,7 @@
     }
     return {
       async load() {
-        const [members, vendors, tasks, links, accounts, settings, schedules, scheduleSlots] = await Promise.all([
+        const [members, vendors, tasks, links, accounts, settings, schedules, scheduleSlots, fixtures] = await Promise.all([
           q(client.from(TABLE.members).select("*").order("name")),
           q(client.from(TABLE.vendors).select("*").order("name")),
           q(client.from(TABLE.tasks).select("*").order("due_date", { ascending: true, nullsFirst: false })),
@@ -113,10 +119,11 @@
           q(client.from(TABLE.settings).select("*").eq("id", 1)).catch(() => []),
           q(client.from(TABLE.schedules).select("*").order("position")).catch(() => []),
           q(client.from(TABLE.scheduleSlots).select("*").order("position")).catch(() => []),
+          q(client.from(TABLE.fixtures).select("*").order("position")).catch(() => []),
         ]);
         return {
           members, vendors, tasks, links, accounts,
-          settings: settings[0] || null, schedules, scheduleSlots,
+          settings: settings[0] || null, schedules, scheduleSlots, fixtures,
         };
       },
       async insert(kind, row) {
@@ -142,7 +149,7 @@
   // State and helpers
   // ------------------------------------------------------------------
   let S = { members: [], vendors: [], tasks: [], links: [], accounts: [],
-    settings: null, schedules: [], scheduleSlots: [] };
+    settings: null, schedules: [], scheduleSlots: [], fixtures: [] };
   const $ = (id) => document.getElementById(id);
 
   function esc(s) {
@@ -283,7 +290,9 @@
   }
 
   function linksFor(kind, id) {
-    const key = kind === "task" ? "responsibility_id" : kind === "vendor" ? "vendor_id" : "account_id";
+    const key = kind === "task" ? "responsibility_id"
+      : kind === "vendor" ? "vendor_id"
+      : kind === "fixture" ? "fixture_id" : "account_id";
     return S.links.filter((l) => l[key] === id)
       .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   }
@@ -406,6 +415,7 @@
     renderVendors();
     renderAccounts();
     renderMembers();
+    renderFixtures();
     renderSchedules();
     renderSettings();
   }
@@ -871,6 +881,117 @@
   // Global events
   // ------------------------------------------------------------------
   // ------------------------------------------------------------------
+  // Fixtures, the building's paint colours, fittings and hardware
+  // ------------------------------------------------------------------
+  const fixtureLinkEditor = makeLinkEditor("xf-links", "xf-link-add");
+
+  function renderFixtures() {
+    const list = S.fixtures.slice().sort((a, b) =>
+      (a.category || "").localeCompare(b.category || "") ||
+      (a.position || 0) - (b.position || 0));
+    const groups = [];
+    for (const f of list) {
+      const cat = f.category || "Other";
+      const last = groups[groups.length - 1];
+      if (last && last.cat === cat) last.items.push(f);
+      else groups.push({ cat: cat, items: [f] });
+    }
+    $("fixture-list").innerHTML = groups.map((g) =>
+      '<h2 class="group-heading">' + esc(g.cat) + "</h2>" +
+      '<div class="card-grid">' + g.items.map(fixtureCard).join("") + "</div>").join("");
+    $("fixture-empty").hidden = S.fixtures.length > 0;
+  }
+
+  function fixtureCard(f) {
+    const lines = [];
+    if (f.code) lines.push('<div class="contact-line"><span class="lbl">Number:</span> ' + esc(f.code) + "</div>");
+    if (f.location) lines.push('<div class="contact-line"><span class="lbl">Used for:</span> ' + esc(f.location) + "</div>");
+    if (f.url) {
+      lines.push('<div class="contact-line"><span class="lbl">Link:</span> <a href="' + esc(safeUrl(f.url)) +
+        '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open</a></div>');
+    }
+    const swatch = f.color_hex
+      ? '<span class="swatch" style="background:' + esc(f.color_hex) + '" aria-hidden="true"></span>'
+      : "";
+    return '<button type="button" class="info-card" data-fixture="' + f.id + '">' +
+      '<h3 class="fixture-title">' + swatch + esc(f.name) + "</h3>" +
+      '<div class="sub">' + esc([f.brand, f.color_hex].filter(Boolean).join(", ") || f.category || "") + "</div>" +
+      lines.join("") +
+      (f.notes ? '<div class="notes">' + esc(f.notes) + "</div>" : "") +
+      linkChips(linksFor("fixture", f.id)) + "</button>";
+  }
+
+  function openFixtureModal(f) {
+    $("fixture-modal-title").textContent = f ? "Edit fixture" : "Add fixture";
+    $("xf-id").value = f ? f.id : "";
+    $("xf-name").value = f ? f.name : "";
+    $("xf-category").value = f ? (f.category || "") : "";
+    $("xf-brand").value = f ? (f.brand || "") : "";
+    $("xf-code").value = f ? (f.code || "") : "";
+    $("xf-location").value = f ? (f.location || "") : "";
+    $("xf-url").value = f ? (f.url || "") : "";
+    $("xf-notes").value = f ? (f.notes || "") : "";
+    const hex = f && f.color_hex ? f.color_hex : "";
+    $("xf-has-color").checked = !!hex;
+    $("xf-color").value = hex || "#cccccc";
+    $("xf-color").disabled = !hex;
+    $("xf-delete").hidden = !f;
+    fixtureLinkEditor.reset(f ? linksFor("fixture", f.id) : []);
+    openModal("fixture-modal");
+    $("xf-name").focus();
+  }
+
+  $("xf-has-color").addEventListener("change", () => {
+    $("xf-color").disabled = !$("xf-has-color").checked;
+  });
+
+  $("fixture-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const id = $("xf-id").value;
+    const row = {
+      name: $("xf-name").value.trim(),
+      category: $("xf-category").value.trim() || "Other",
+      brand: $("xf-brand").value.trim() || null,
+      code: $("xf-code").value.trim() || null,
+      location: $("xf-location").value.trim() || null,
+      url: $("xf-url").value.trim() ? safeUrl($("xf-url").value.trim()) : null,
+      color_hex: $("xf-has-color").checked ? $("xf-color").value : null,
+      notes: $("xf-notes").value.trim() || null,
+    };
+    try {
+      let saved;
+      if (id) {
+        const existing = S.fixtures.find((x) => x.id === id);
+        const patch = await getStore().update("fixtures", id, row);
+        Object.assign(existing, patch || row);
+        saved = existing;
+      } else {
+        saved = await getStore().insert("fixtures", Object.assign({ position: S.fixtures.length }, row));
+        S.fixtures.push(saved);
+      }
+      await saveLinks(fixtureLinkEditor, "fixture_id", saved.id);
+      closeModal("fixture-modal");
+      toast("Saved.");
+      renderFixtures();
+    } catch (err) { fail(err); }
+  });
+
+  $("xf-delete").addEventListener("click", async () => {
+    const id = $("xf-id").value;
+    if (!id || !confirm("Delete this fixture?")) return;
+    try {
+      await getStore().remove("fixtures", id);
+      S.fixtures = S.fixtures.filter((x) => x.id !== id);
+      S.links = S.links.filter((l) => l.fixture_id !== id);
+      closeModal("fixture-modal");
+      toast("Deleted.");
+      renderFixtures();
+    } catch (e) { fail(e); }
+  });
+
+  $("btn-new-fixture").addEventListener("click", () => openFixtureModal(null));
+
+  // ------------------------------------------------------------------
   // Schedules, such as the trash rotation
   // ------------------------------------------------------------------
   const MONTHS = ["January", "February", "March", "April", "May", "June",
@@ -1212,7 +1333,7 @@
     callReminderFunction("force");
   });
 
-  const VIEWS = ["dashboard", "tasks", "vendors", "accounts", "board", "schedules", "settings"];
+  const VIEWS = ["dashboard", "tasks", "vendors", "accounts", "board", "fixtures", "schedules", "settings"];
 
   // The tabs appear twice, once in the top bar and once in the mobile
   // sidebar, so both copies are kept in step.
@@ -1256,7 +1377,7 @@
   $("menu-close").addEventListener("click", () => { closeSidebar(); $("menu-open").focus(); });
   $("sidebar-backdrop").addEventListener("click", () => { closeSidebar(); $("menu-open").focus(); });
   // Keep the sidebar from being left open and hidden when rotating to a wide screen.
-  window.addEventListener("resize", () => { if (window.innerWidth > 860) closeSidebar(); });
+  window.addEventListener("resize", () => { if (window.innerWidth > 1160) closeSidebar(); });
 
   document.body.addEventListener("click", (e) => {
     const doneBtn = e.target.closest("[data-done]");
@@ -1273,6 +1394,8 @@
     if (vc) { const v = vendorById(vc.dataset.vendor); if (v) openVendorModal(v); return; }
     const ac = e.target.closest("[data-account]");
     if (ac) { const a = accountById(ac.dataset.account); if (a) openAccountModal(a); return; }
+    const fx = e.target.closest("[data-fixture]");
+    if (fx) { const x = S.fixtures.find((y) => y.id === fx.dataset.fixture); if (x) openFixtureModal(x); return; }
     const sc = e.target.closest("[data-schedule]");
     if (sc) { const x = S.schedules.find((y) => y.id === sc.dataset.schedule); if (x) openScheduleModal(x); return; }
     const mc = e.target.closest("[data-member]");
@@ -1341,6 +1464,7 @@
       S.settings = Object.assign({}, DEFAULT_SETTINGS, S.settings || {});
       S.schedules = S.schedules || [];
       S.scheduleSlots = S.scheduleSlots || [];
+      S.fixtures = S.fixtures || [];
       renderFilterOptions();
       renderAll();
     } catch (e) {

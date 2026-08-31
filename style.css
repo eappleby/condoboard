@@ -104,18 +104,21 @@ body.locked > .topbar, body.locked > .container, body.locked > .demo-banner { di
 }
 .brand { font-weight: 700; font-size: 20px; white-space: nowrap; }
 
-.tabs { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; }
+/* Eight tabs have to fit on one line. Below the breakpoint they move into
+   the sidebar instead of wrapping. */
+.tabs { display: flex; gap: 4px; flex: 1; flex-wrap: nowrap; }
 .tab {
   border: 2px solid transparent;
   background: none;
-  padding: 10px 16px;
+  padding: 10px 12px;
   min-height: 44px;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 15px;
   font-family: inherit;
   color: var(--text-soft);
   cursor: pointer;
   font-weight: 600;
+  white-space: nowrap;
 }
 .tab:hover { background: var(--surface-alt); color: var(--text); }
 .tab.active { background: var(--primary-soft); color: var(--primary-dark); border-color: var(--primary); }
@@ -152,7 +155,7 @@ body.locked > .topbar, body.locked > .container, body.locked > .demo-banner { di
   padding: 16px; border-bottom: 2px solid var(--border);
 }
 .sidebar-nav { display: flex; flex-direction: column; gap: 6px; padding: 16px; }
-.sidebar-nav .tab { width: 100%; text-align: left; font-size: 17px; padding: 14px 16px; min-height: 52px; }
+.sidebar-nav .tab { width: 100%; text-align: left; font-size: 17px; padding: 14px 16px; min-height: 52px; white-space: normal; }
 .sidebar-actions { padding: 0 16px 20px; margin-top: auto; }
 
 /* ---------- layout ---------- */
@@ -464,7 +467,7 @@ textarea.input { min-height: 80px; }
   .stats { grid-template-columns: repeat(2, 1fr); }
   .dash-grid { grid-template-columns: 1fr; }
 }
-@media (max-width: 860px) {
+@media (max-width: 1160px) {
   /* Below this width the tabs would wrap onto a second line, so they move
      into the slide out menu instead. */
   .menu-btn { display: inline-flex; }
@@ -499,4 +502,10 @@ textarea.input { min-height: 80px; }
 .preview-frame {
   width: 100%; height: 60vh; min-height: 380px; border: 2px solid var(--border);
   border-radius: 8px; background: #fff;
+}
+
+.fixture-title { display: flex; align-items: center; gap: 10px; }
+.swatch {
+  width: 26px; height: 26px; border-radius: 6px; flex: 0 0 auto;
+  border: 1px solid var(--border-strong);
 }

@@ -50,9 +50,11 @@ replies in chat:
 ## Data model
 
 Tables: `board_members`, `vendors`, `responsibilities`, `links`, `accounts`,
-`reminder_settings`, `schedules`, `schedule_slots`. A link belongs to exactly
-one of a responsibility, a vendor, or an account, and carries a `sort_order`
-so the board can arrange documents by hand.
+`reminder_settings`, `schedules`, `schedule_slots`, `fixtures`. A link belongs
+to exactly one of a responsibility, a vendor, an account, or a fixture, and
+carries a `sort_order` so the board can arrange documents by hand. Adding a
+new owner type means a column on `links`, a branch in `linksFor()`, and the
+new key in the row built by `saveLinks()`.
 RLS is on with wide open policies for `anon`, which is deliberate given there
 is no per person login.
 
@@ -155,13 +157,29 @@ use the new behaviour.
 
 ## Mobile navigation
 
-Below 860px the top bar tabs and the Add button are hidden and a hamburger
-opens a left sidebar. The tabs exist twice in the markup, once in the top bar
+Below 1160px the top bar tabs and the Add button are hidden and a hamburger
+opens a left sidebar. The breakpoint is set by how many tabs there are, not
+by a device size. Eight tabs stop fitting at about 1160px, so adding another
+tab means testing widths again and probably raising it. `.tabs` is
+`nowrap` so a too-small breakpoint shows as horizontal overflow rather than a
+second row. The tabs exist twice in the markup, once in the top bar
 and once in the sidebar, and `showView()` keeps both copies in sync by
 `data-tab`. Escape closes a dialog first and only falls through to the
 sidebar when no dialog is open. The sidebar is unhidden before the `open`
 class is added on the next frame, otherwise the slide in animation does not
 run.
+
+## Fixtures
+
+The building's specification: paint colours, fittings, hardware, appliances.
+Cards are grouped by category, and `color_hex` draws a swatch when present.
+
+Paint swatches were read from Benjamin Moore's own colour pages, from the
+`meta-bmc_color_hex` value, not guessed. Where the page did not confirm the
+colour, PM-2 in this case, the swatch is left empty on purpose. A wrong
+swatch is worse than none, so do not fill one in by eye. Benjamin Moore has
+renamed 2063-10 from "Old Navy" to "Winding Waterway"; the number is what
+identifies the paint.
 
 ## Documents and schedules
 

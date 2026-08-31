@@ -48,6 +48,7 @@
         <button class="tab" data-tab="vendors">Vendors</button>
         <button class="tab" data-tab="accounts">Accounts</button>
         <button class="tab" data-tab="board">Board</button>
+        <button class="tab" data-tab="fixtures">Fixtures</button>
         <button class="tab" data-tab="schedules">Schedules</button>
         <button class="tab" data-tab="settings">Settings</button>
       </nav>
@@ -67,6 +68,7 @@
       <button class="tab" data-tab="vendors">Vendors</button>
       <button class="tab" data-tab="accounts">Accounts</button>
       <button class="tab" data-tab="board">Board</button>
+        <button class="tab" data-tab="fixtures">Fixtures</button>
         <button class="tab" data-tab="schedules">Schedules</button>
       <button class="tab" data-tab="settings">Settings</button>
     </nav>
@@ -184,6 +186,15 @@
       </div>
       <div class="card-grid" id="member-grid"></div>
       <p class="empty-note" id="member-empty" hidden>No board members yet.</p>
+    </section>
+
+    <!-- ============ FIXTURES ============ -->
+    <section id="view-fixtures" class="view" aria-label="Fixtures" hidden>
+      <div class="section-head">
+        <button class="btn btn-primary" id="btn-new-fixture">Add fixture</button>
+      </div>
+      <div id="fixture-list"></div>
+      <p class="empty-note" id="fixture-empty" hidden>Nothing added yet.</p>
     </section>
 
     <!-- ============ SCHEDULES ============ -->
@@ -442,6 +453,80 @@
           <button type="button" class="btn btn-danger" id="af-delete" hidden>Delete</button>
           <span class="spacer"></span>
           <button type="button" class="btn" data-close="account-modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ FIXTURE MODAL ============ -->
+  <div class="modal-backdrop" id="fixture-modal" role="dialog" aria-modal="true" aria-labelledby="fixture-modal-title" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="fixture-modal-title">Add fixture</h2>
+        <button class="btn-close" data-close="fixture-modal" aria-label="Close">Close</button>
+      </div>
+      <form id="fixture-form" class="modal-body">
+        <input type="hidden" id="xf-id">
+        <div class="field-row">
+          <label class="field">
+            <span>Name <span class="req">(required)</span></span>
+            <input class="input" id="xf-name" required>
+          </label>
+          <label class="field">
+            <span>Category</span>
+            <input class="input" id="xf-category" list="fixture-categories">
+            <datalist id="fixture-categories">
+              <option value="Paint"></option>
+              <option value="Lighting"></option>
+              <option value="Hardware"></option>
+              <option value="Intercom"></option>
+              <option value="Appliances"></option>
+              <option value="Other"></option>
+            </datalist>
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Brand</span>
+            <input class="input" id="xf-brand">
+          </label>
+          <label class="field">
+            <span>Colour or model number</span>
+            <input class="input" id="xf-code">
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Where it is used</span>
+            <input class="input" id="xf-location">
+          </label>
+          <label class="field">
+            <span>Swatch colour</span>
+            <input class="input" type="color" id="xf-color">
+          </label>
+        </div>
+        <label class="checkbox-row">
+          <input type="checkbox" id="xf-has-color">
+          <span>Show a colour swatch</span>
+        </label>
+        <label class="field">
+          <span>Link</span>
+          <input class="input" id="xf-url" placeholder="https://">
+        </label>
+        <label class="field">
+          <span>Notes</span>
+          <textarea class="input" id="xf-notes" rows="2"></textarea>
+        </label>
+        <fieldset class="links-fieldset">
+          <legend>Documents</legend>
+          <div id="xf-links"></div>
+          <button type="button" class="btn" id="xf-link-add">Add a document</button>
+        </fieldset>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-danger" id="xf-delete" hidden>Delete</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn" data-close="fixture-modal">Cancel</button>
           <button type="submit" class="btn btn-primary">Save</button>
         </div>
       </form>
