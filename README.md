@@ -4,7 +4,7 @@ A free, self hosted tracker for the 372 12th board. It shows what is
 upcoming, what is overdue, who is responsible, what things cost, who the
 building's vendors are, and where the city portals and account numbers live.
 Recurring duties roll forward to their next occurrence when you mark them
-done, and a daily job emails reminders to whoever is assigned.
+done, and a monthly email summarises where things stand.
 
 Everything runs on free tiers:
 
@@ -49,10 +49,18 @@ sample data and nothing is saved.
   recommended so far.
 * **Accounts.** Utility accounts and city portals with account numbers,
   usernames, and links. There is no password field, on purpose.
-* **Board.** Members with position, apartment, email and phone. Reminder
-  emails go to the addresses listed here.
-* **Reminder emails.** A daily job emails each member the items assigned to
-  them that are overdue or due within seven days.
+* **Board.** Members with position, apartment, email and phone.
+* **Schedules.** Rotating duties such as the trash and recycling roster.
+  Give a row its months and the site marks whose turn it is right now.
+* **Settings.** Turn the email on or off, choose the day it goes out, and
+  preview it, without touching any code.
+* **Monthly summary email.** Off until you switch it on. It has three parts:
+  anything overdue in full, the month ahead in full with who is responsible,
+  vendor contacts, documents and costs, then the month after that as a short
+  list of names and who has them.
+* **Documents.** Every responsibility, vendor and account can hold a list of
+  documents. Edit a label or address in place, drag rows to reorder them, or
+  use the up and down buttons.
 
 ## Accessibility
 
@@ -131,61 +139,60 @@ real records should appear.
 
 Share that address and the password with the board.
 
-### 4. Reminder emails
+### 4. The monthly summary email
 
-Reminders are sent by a Supabase Edge Function that Supabase cron calls once
-a day, delivered through [Resend](https://resend.com), which is free for 100
-emails a day.
+The email is off until you turn it on, so this can all be set up safely
+before the board is ready. A Supabase cron job calls the function once a day,
+and the function reads the Settings tab to decide what to do. If reminders
+are off, it sends nothing and says so. That is why the cron stays daily even
+though the email is monthly. The daily run is only a heartbeat, and the
+Settings row decides whether it acts.
 
-The function has two modes, because of a Resend rule worth understanding.
-Resend's shared testing sender, `onboarding@resend.dev`, will only deliver to
-the address the Resend account was created with. Emailing each board member
-individually therefore requires a domain you own and have verified in Resend,
-which costs roughly $12 a year.
-
-**Digest mode** is the free path. One email lists everything due, grouped by
-who is responsible, and goes to a single address. Set `DIGEST_TO` to turn it
-on.
-
-**Per person mode** gives each member only their own items. Leave `DIGEST_TO`
-unset. This needs a verified domain.
+Delivery is through [Resend](https://resend.com), free for 100 emails a day.
+There is a Resend rule worth knowing: the shared sender
+`onboarding@resend.dev` only delivers to the address the Resend account was
+created with. Emailing each board member separately therefore needs a domain
+you own and have verified in Resend, roughly $12 a year. One grouped email to
+the building address is the free path.
 
 1. Sign up at Resend and create an API key.
 2. Deploy the function and set its secrets. Skip the deploy line if you
    enabled the GitHub integration in step 1b, since it deploys the function
    for you, but you still need the secrets.
 
-   Digest mode, no domain required:
-
    ```sh
    supabase functions deploy send-reminders
    supabase secrets set \
      RESEND_API_KEY=re_xxx \
      FROM_EMAIL="372 12th Board <onboarding@resend.dev>" \
-     DIGEST_TO=37212th@gmail.com \
      APP_URL=https://37212th.pages.dev
    ```
 
-   Per person mode, once a domain is verified:
-
-   ```sh
-   supabase secrets unset DIGEST_TO
-   supabase secrets set \
-     FROM_EMAIL="372 12th Board <board@yourdomain.com>" \
-     FALLBACK_EMAIL=37212th@gmail.com
-   ```
-
-   `FALLBACK_EMAIL` receives reminders for unassigned items and `APP_URL` is
-   linked in the emails. Both are optional. In digest mode unassigned items
-   appear under their own heading, so no fallback is needed.
+   Once you own a domain, verify it in Resend and change `FROM_EMAIL` to an
+   address on it. Only then will per person delivery work.
 3. Edit `supabase/reminders-cron.sql`, replace the project ref and anon key
-   placeholders, and run it in the SQL Editor. The default schedule is 13:00
+   placeholders, and run it in the SQL Editor. The job fires daily at 13:00
    UTC, which is 9 AM Eastern.
-4. To test without waiting for the schedule, open Edge Functions, then
-   send-reminders, and use Invoke.
+4. Open the Settings tab, set the address and the day of the month, then
+   press **Preview the email**. It builds the real email from live data and
+   shows it exactly as it will arrive, without sending anything. When it
+   looks right, tick "Send reminder emails" and save.
 
-An item is not mentioned again for three days, so the reminders do not become
-noise. Both settings live at the top of `index.ts`.
+**Preview the email** never sends. **Send it now** does, immediately,
+ignoring both the schedule and the on and off switch. It is the only control
+on the page that delivers real mail while reminders are off.
+
+### Which months the email covers
+
+Sent on or before the 20th, the detailed month is the current one, since most
+of it is still ahead. From the 21st it rolls to the next month, which suits a
+board sending near the end of the month to prepare for the next. The email
+always names the months it covers, so there is no guessing. Overdue items
+appear in full every time, however far past they are.
+
+Everything else lives on the Settings tab. The only pieces that stay as
+Supabase secrets are the Resend key and the sender address, because those do
+not belong in a database that anyone with the site address can read.
 
 ## Changing the schema later
 

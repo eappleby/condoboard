@@ -43,8 +43,10 @@ replies in chat:
 
 ## Data model
 
-Tables: `board_members`, `vendors`, `responsibilities`, `links`, `accounts`.
-A link belongs to exactly one of a responsibility, a vendor, or an account.
+Tables: `board_members`, `vendors`, `responsibilities`, `links`, `accounts`,
+`reminder_settings`, `schedules`, `schedule_slots`. A link belongs to exactly
+one of a responsibility, a vendor, or an account, and carries a `sort_order`
+so the board can arrange documents by hand.
 RLS is on with wide open policies for `anon`, which is deliberate given there
 is no per person login.
 
@@ -88,20 +90,43 @@ Pricing, checked 2026-08-31: deploying from GitHub to production is free on
 any plan. Preview branches are Pro only at $0.01344 per branch per hour. Do
 not enable branching without flagging the cost.
 
-## Reminder emails
+## The monthly summary email
 
-`buildMessages()` in the Edge Function is a pure function on purpose, so the
-email content can be tested with Deno without touching the network. Run
-`deno run --allow-read --allow-net --allow-env` against a small script that
-imports it. The `Deno.serve` call is guarded by `import.meta.main` so
-importing the module in a test does not start a server.
+`buildDigest()` and `buildMessages()` are pure on purpose, so the email
+content can be tested with Deno without touching the network. Run
+`deno run --allow-read --allow-net --allow-env` against a script that imports
+them. The `Deno.serve` call is guarded by `import.meta.main`, so importing
+the module in a test does not start a server.
 
-Two modes, chosen by whether the `DIGEST_TO` secret is set. Digest mode sends
-one grouped email to a single address, which is the only free option because
-Resend's `onboarding@resend.dev` sender only delivers to the Resend account
-owner's own address. Per person mode needs a verified domain, roughly $12 a
-year. Evan is on digest mode to 37212th@gmail.com, which forwards to the
-whole board.
+Structure: overdue in full, the month ahead in full, the month after as a
+slim list. `coveredMonths()` decides which months those are. On or before
+the 20th the detailed month is the current one, from the 21st it rolls to the
+next. It handles the year boundary. If that rule changes, change the wording
+on the Settings tab and in README.md too, since both explain it.
+
+`days_ahead` and `cooldown_days` are dead columns. The email is month based
+now, and a monthly summary should repeat an open item rather than suppress
+it. The columns stay for compatibility but nothing reads them, and the
+Settings tab no longer offers them.
+
+Behaviour is driven by the `reminder_settings` row, edited on the Settings
+tab. The function does nothing while `reminders_enabled` is false, which is
+the default, so the cron job is safe to schedule early. The cron fires daily
+and `isSendDay()` turns that into weekly or monthly. Monthly is the default.
+
+`?dry=1` returns the built email including its HTML, without sending or
+recording. The site renders that HTML in a sandboxed iframe via `srcdoc`, so
+the preview is the real email rather than a summary of it. `?force=1` ignores
+both the schedule and the enabled flag, behind a confirm dialog that names
+the recipient. CORS headers are required because the site calls
+the function directly from the browser.
+
+Only the Resend key and sender stay as secrets, since the settings table is
+readable by anyone who can reach the site. Digest mode sends one grouped
+email and is the only free option, because Resend's `onboarding@resend.dev`
+sender only delivers to the Resend account owner's own address. Per person
+mode needs a verified domain, roughly $12 a year. Evan is on digest mode to
+37212th@gmail.com, which forwards to the whole board.
 
 ## Mobile navigation
 
@@ -112,6 +137,20 @@ and once in the sidebar, and `showView()` keeps both copies in sync by
 sidebar when no dialog is open. The sidebar is unhidden before the `open`
 class is added on the next frame, otherwise the slide in animation does not
 run.
+
+## Documents and schedules
+
+`makeLinkEditor()` builds the document rows used by the responsibility,
+vendor and account modals. Rows are edited in place, reordered by dragging
+the handle or with the up and down buttons, and saved by index into
+`sort_order`. The buttons are not decoration: dragging is unusable with a
+keyboard or a screen reader, so both paths must keep working. There is no
+document type dropdown any more, and new rows are saved with kind
+`document`. Rows with an empty address are dropped on save.
+
+The schedule slot editor in the Schedules tab repeats the same pattern.
+Slots carry optional `month_start` and `month_end`, and `isCurrentSlot()`
+marks whoever is up this month. It handles ranges that wrap past December.
 
 ## Conventions and gotchas
 
@@ -137,10 +176,22 @@ run.
 Serve locally with `python3 -m http.server` and drive demo mode with
 Playwright. Automated tests must pass the gate first.
 
-Worth repeating after changes: the gate, add, edit and delete for all four
-record types, Mark done on a recurring item (row count grows by exactly one
+Worth repeating after changes: the gate, add, edit and delete for every
+record type, Mark done on a recurring item (row count grows by exactly one
 and the next date is right), links add and remove, filters, Escape closing a
-dialog, and the mobile viewport.
+dialog, the settings form including the live summary and the guard on an empty
+digest address, document reorder and rename round trips, schedule editing,
+and the mobile viewport.
+
+The container blocks jsDelivr, so `window.supabase` is undefined here and any
+test that leaves demo mode must stub the network with `page.route`. See
+/tmp/test-preview.js in the session that built this for the pattern: stub
+config.js, `**/rest/v1/**`, and `**/functions/v1/send-reminders**`.
+
+Playwright note: `.info-card` matches cards in hidden views too, so scope
+selectors to the visible section, for example `#view-accounts .info-card`.
+Clicking a card's centre can land on a link chip, which opens the link
+instead of the modal, so click the heading.
 
 Migrations can be verified without Docker. Run `initdb` on a scratch cluster,
 `create role anon; create role authenticated;`, then psql the migration files

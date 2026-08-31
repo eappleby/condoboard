@@ -26,6 +26,8 @@
   // Data stores
   // ------------------------------------------------------------------
   const demoMode = !CFG.SUPABASE_URL || !CFG.SUPABASE_ANON_KEY;
+  const MONTHS_SEED = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
 
   function demoData() {
     const uid = () => crypto.randomUUID();
@@ -58,12 +60,22 @@
     const links = [
       { id: uid(), title: "Sample document", url: "https://example.com", kind: "document", responsibility_id: tasks[0].id, vendor_id: null, account_id: null },
     ];
-    return { members, vendors, tasks, links, accounts };
+    const settings = { id: 1, reminders_enabled: false, frequency: "monthly", send_weekday: 1,
+      send_day_of_month: 1, delivery_mode: "digest", digest_email: null, last_sent_at: null };
+    const schedules = [{ id: uid(), name: "Trash and recycling", description: "Sample rotation.", position: 0 }];
+    const scheduleSlots = [1, 3, 5, 7, 9, 11].map((mo, i) => ({
+      id: uid(), schedule_id: schedules[0].id,
+      label: MONTHS_SEED[mo - 1] + "/" + MONTHS_SEED[mo],
+      responsible: "Apt " + (i + 1), month_start: mo, month_end: mo + 1, position: i,
+    }));
+    return { members, vendors, tasks, links, accounts, settings, schedules, scheduleSlots };
   }
 
   const TABLE = {
     members: "board_members", vendors: "vendors",
     tasks: "responsibilities", links: "links", accounts: "accounts",
+    settings: "reminder_settings",
+    schedules: "schedules", scheduleSlots: "schedule_slots",
   };
 
   function makeDemoStore() {
@@ -78,6 +90,10 @@
   }
 
   function makeSupabaseStore() {
+    if (!window.supabase || !window.supabase.createClient) {
+      throw new Error("The Supabase library did not load. Check the network connection, " +
+        "or whether the script tag at the bottom of index.html is being blocked.");
+    }
     const client = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
     async function q(promise) {
       const { data, error } = await promise;
@@ -86,14 +102,22 @@
     }
     return {
       async load() {
-        const [members, vendors, tasks, links, accounts] = await Promise.all([
+        const [members, vendors, tasks, links, accounts, settings, schedules, scheduleSlots] = await Promise.all([
           q(client.from(TABLE.members).select("*").order("name")),
           q(client.from(TABLE.vendors).select("*").order("name")),
           q(client.from(TABLE.tasks).select("*").order("due_date", { ascending: true, nullsFirst: false })),
           q(client.from(TABLE.links).select("*")),
           q(client.from(TABLE.accounts).select("*").order("name")),
+          // Non fatal: if the settings migration has not been applied yet the
+          // rest of the app should still load, with defaults in the form.
+          q(client.from(TABLE.settings).select("*").eq("id", 1)).catch(() => []),
+          q(client.from(TABLE.schedules).select("*").order("position")).catch(() => []),
+          q(client.from(TABLE.scheduleSlots).select("*").order("position")).catch(() => []),
         ]);
-        return { members, vendors, tasks, links, accounts };
+        return {
+          members, vendors, tasks, links, accounts,
+          settings: settings[0] || null, schedules, scheduleSlots,
+        };
       },
       async insert(kind, row) {
         return (await q(client.from(TABLE[kind]).insert(row).select()))[0];
@@ -117,7 +141,8 @@
   // ------------------------------------------------------------------
   // State and helpers
   // ------------------------------------------------------------------
-  let S = { members: [], vendors: [], tasks: [], links: [], accounts: [] };
+  let S = { members: [], vendors: [], tasks: [], links: [], accounts: [],
+    settings: null, schedules: [], scheduleSlots: [] };
   const $ = (id) => document.getElementById(id);
 
   function esc(s) {
@@ -259,7 +284,8 @@
 
   function linksFor(kind, id) {
     const key = kind === "task" ? "responsibility_id" : kind === "vendor" ? "vendor_id" : "account_id";
-    return S.links.filter((l) => l[key] === id);
+    return S.links.filter((l) => l[key] === id)
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   }
 
   function linkChips(links) {
@@ -380,6 +406,8 @@
     renderVendors();
     renderAccounts();
     renderMembers();
+    renderSchedules();
+    renderSettings();
   }
 
   // ------------------------------------------------------------------
@@ -434,52 +462,140 @@
     if (!closedAny && !$("sidebar").hidden) { closeSidebar(); $("menu-open").focus(); }
   });
 
-  // Link editors shared by the task and vendor modals.
-  function makeLinkEditor(containerId, titleId, urlId, kindId, addBtnId) {
+  // Document editor, shared by the responsibility, vendor and account modals.
+  // Rows can be edited in place, reordered by dragging the handle or with the
+  // up and down buttons, and removed. The buttons exist because dragging is
+  // not usable with a keyboard or a screen reader.
+  function makeLinkEditor(containerId, addBtnId) {
     let draft = [];
     let removed = [];
-    function render() {
-      $(containerId).innerHTML = draft.length
-        ? draft.map((l, i) =>
-            '<div class="link-row"><span class="kind">' + esc(l.kind) + "</span>" +
-            '<a href="' + esc(safeUrl(l.url)) + '" target="_blank" rel="noopener">' + esc(l.title || l.url) + "</a>" +
-            '<button type="button" class="rm" data-rm="' + i + '">Remove</button></div>').join("")
-        : '<p class="link-none">Nothing added yet.</p>';
-      $(containerId).querySelectorAll("[data-rm]").forEach((b) =>
+    let dragFrom = null;
+
+    function move(from, to) {
+      if (to < 0 || to >= draft.length) return;
+      draft.splice(to, 0, draft.splice(from, 1)[0]);
+      render(to);
+    }
+
+    function render(focusIndex) {
+      const el = $(containerId);
+      if (!draft.length) {
+        el.innerHTML = '<p class="link-none">Nothing added yet.</p>';
+        return;
+      }
+      el.innerHTML = draft.map((l, i) =>
+        '<div class="doc-row" draggable="true" data-i="' + i + '">' +
+          '<span class="doc-grip" aria-hidden="true" title="Drag to reorder">' +
+            '<svg viewBox="0 0 16 16" width="16" height="16"><circle cx="6" cy="4" r="1.4" fill="currentColor"/>' +
+            '<circle cx="10" cy="4" r="1.4" fill="currentColor"/><circle cx="6" cy="8" r="1.4" fill="currentColor"/>' +
+            '<circle cx="10" cy="8" r="1.4" fill="currentColor"/><circle cx="6" cy="12" r="1.4" fill="currentColor"/>' +
+            '<circle cx="10" cy="12" r="1.4" fill="currentColor"/></svg></span>' +
+          '<div class="doc-fields">' +
+            '<label class="field"><span class="visually-hidden">Document label</span>' +
+              '<input class="input" data-f="title" data-i="' + i + '" placeholder="Label" value="' + esc(l.title || "") + '"></label>' +
+            '<label class="field"><span class="visually-hidden">Web address</span>' +
+              '<input class="input" data-f="url" data-i="' + i + '" placeholder="https://" value="' + esc(l.url || "") + '"></label>' +
+          "</div>" +
+          '<div class="doc-buttons">' +
+            '<button type="button" class="doc-btn" data-move="up" data-i="' + i + '" ' +
+              (i === 0 ? "disabled " : "") + 'aria-label="Move up">Up</button>' +
+            '<button type="button" class="doc-btn" data-move="down" data-i="' + i + '" ' +
+              (i === draft.length - 1 ? "disabled " : "") + 'aria-label="Move down">Down</button>' +
+            '<button type="button" class="doc-btn doc-rm" data-rm="' + i + '" aria-label="Remove">Remove</button>' +
+          "</div></div>").join("");
+
+      el.querySelectorAll("input[data-f]").forEach((input) =>
+        input.addEventListener("input", () => {
+          draft[Number(input.dataset.i)][input.dataset.f] = input.value;
+        }));
+      el.querySelectorAll("[data-move]").forEach((b) =>
+        b.addEventListener("click", () => {
+          const i = Number(b.dataset.i);
+          move(i, b.dataset.move === "up" ? i - 1 : i + 1);
+        }));
+      el.querySelectorAll("[data-rm]").forEach((b) =>
         b.addEventListener("click", () => {
           const i = Number(b.dataset.rm);
           if (draft[i].id) removed.push(draft[i].id);
           draft.splice(i, 1);
           render();
         }));
+
+      el.querySelectorAll(".doc-row").forEach((row) => {
+        row.addEventListener("dragstart", (e) => {
+          dragFrom = Number(row.dataset.i);
+          row.classList.add("dragging");
+          e.dataTransfer.effectAllowed = "move";
+          // Firefox will not start a drag without data set.
+          e.dataTransfer.setData("text/plain", String(dragFrom));
+        });
+        row.addEventListener("dragend", () => { row.classList.remove("dragging"); dragFrom = null; });
+        row.addEventListener("dragover", (e) => { e.preventDefault(); row.classList.add("drag-over"); });
+        row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+        row.addEventListener("drop", (e) => {
+          e.preventDefault();
+          row.classList.remove("drag-over");
+          const to = Number(row.dataset.i);
+          if (dragFrom != null && dragFrom !== to) move(dragFrom, to);
+        });
+      });
+
+      if (focusIndex != null) {
+        const btn = el.querySelector('.doc-row[data-i="' + focusIndex + '"] [data-move]:not([disabled])');
+        if (btn) btn.focus();
+      }
     }
+
     $(addBtnId).addEventListener("click", () => {
-      const url = $(urlId).value.trim();
-      if (!url) { toast("Enter a web address for the link.", true); return; }
-      draft.push({ title: $(titleId).value.trim() || url, url: safeUrl(url), kind: $(kindId).value });
-      $(titleId).value = ""; $(urlId).value = "";
+      draft.push({ title: "", url: "" });
       render();
+      const inputs = $(containerId).querySelectorAll('input[data-f="title"]');
+      if (inputs.length) inputs[inputs.length - 1].focus();
     });
+
     return {
-      reset(existing) { draft = existing.map((l) => ({ id: l.id, title: l.title, url: l.url, kind: l.kind })); removed = []; render(); },
-      draft: () => draft,
+      reset(existing) {
+        draft = existing
+          .slice()
+          .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+          .map((l) => ({ id: l.id, title: l.title, url: l.url }));
+        removed = [];
+        render();
+      },
+      // Drops rows with no address at all, so an empty row added by accident
+      // does not get saved.
+      rows: () => draft.filter((l) => (l.url || "").trim()),
       removed: () => removed,
     };
   }
 
-  const taskLinkEditor = makeLinkEditor("tf-links", "tf-link-title", "tf-link-url", "tf-link-kind", "tf-link-add");
-  const vendorLinkEditor = makeLinkEditor("vf-links", "vf-link-title", "vf-link-url", "vf-link-kind", "vf-link-add");
+  const taskLinkEditor = makeLinkEditor("tf-links", "tf-link-add");
+  const vendorLinkEditor = makeLinkEditor("vf-links", "vf-link-add");
+  const accountLinkEditor = makeLinkEditor("af-links", "af-link-add");
 
   async function saveLinks(editor, ownerKey, ownerId) {
     for (const id of editor.removed()) {
       await getStore().remove("links", id);
       S.links = S.links.filter((l) => l.id !== id);
     }
-    for (const l of editor.draft()) {
-      if (l.id) continue;
-      const row = { title: l.title, url: l.url, kind: l.kind, responsibility_id: null, vendor_id: null, account_id: null };
-      row[ownerKey] = ownerId;
-      S.links.push(await getStore().insert("links", row));
+    const rows = editor.rows();
+    for (let i = 0; i < rows.length; i++) {
+      const l = rows[i];
+      const url = safeUrl(l.url);
+      const title = (l.title || "").trim() || url;
+      if (l.id) {
+        const existing = S.links.find((x) => x.id === l.id);
+        const patch = { title: title, url: url, sort_order: i };
+        await getStore().update("links", l.id, patch);
+        if (existing) Object.assign(existing, patch);
+      } else {
+        const row = {
+          title: title, url: url, kind: "document", sort_order: i,
+          responsibility_id: null, vendor_id: null, account_id: null,
+        };
+        row[ownerKey] = ownerId;
+        S.links.push(await getStore().insert("links", row));
+      }
     }
   }
 
@@ -652,6 +768,7 @@
     $("af-url").value = a ? (a.portal_url || "") : "";
     $("af-notes").value = a ? (a.notes || "") : "";
     $("af-delete").hidden = !a;
+    accountLinkEditor.reset(a ? linksFor("account", a.id) : []);
     openModal("account-modal");
     $("af-name").focus();
   }
@@ -672,8 +789,11 @@
         const existing = accountById(id);
         const patch = await getStore().update("accounts", id, row);
         Object.assign(existing, patch || row);
+        await saveLinks(accountLinkEditor, "account_id", id);
       } else {
-        S.accounts.push(await getStore().insert("accounts", row));
+        const created = await getStore().insert("accounts", row);
+        S.accounts.push(created);
+        await saveLinks(accountLinkEditor, "account_id", created.id);
       }
       closeModal("account-modal");
       toast("Saved.");
@@ -750,7 +870,385 @@
   // ------------------------------------------------------------------
   // Global events
   // ------------------------------------------------------------------
-  const VIEWS = ["dashboard", "tasks", "vendors", "accounts", "board"];
+  // ------------------------------------------------------------------
+  // Schedules, such as the trash rotation
+  // ------------------------------------------------------------------
+  const MONTHS = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
+
+  function slotsFor(scheduleId) {
+    return S.scheduleSlots.filter((x) => x.schedule_id === scheduleId)
+      .sort((a, b) => (a.position || 0) - (b.position || 0));
+  }
+
+  // A slot is current when this month falls inside its month range. Ranges
+  // that wrap around the end of the year are handled too.
+  function isCurrentSlot(slot, month) {
+    if (!slot.month_start || !slot.month_end) return false;
+    if (slot.month_start <= slot.month_end) {
+      return month >= slot.month_start && month <= slot.month_end;
+    }
+    return month >= slot.month_start || month <= slot.month_end;
+  }
+
+  function renderSchedules() {
+    const month = new Date().getMonth() + 1;
+    const list = S.schedules.slice().sort((a, b) => (a.position || 0) - (b.position || 0));
+    $("schedule-list").innerHTML = list.map((sc) => {
+      const slots = slotsFor(sc.id);
+      const current = slots.find((s) => isCurrentSlot(s, month));
+      const rows = slots.map((s) => {
+        const on = current && s.id === current.id;
+        return '<tr class="' + (on ? "slot-current" : "") + '">' +
+          "<td>" + esc(s.label) + (on ? ' <span class="badge badge-open">This month</span>' : "") + "</td>" +
+          "<td>" + esc(s.responsible || "Not set") + "</td></tr>";
+      }).join("");
+      return '<article class="schedule-card">' +
+        '<div class="schedule-head">' +
+          "<div><h3>" + esc(sc.name) + "</h3>" +
+          (sc.description ? '<p class="sub">' + esc(sc.description) + "</p>" : "") + "</div>" +
+          '<button type="button" class="btn" data-schedule="' + sc.id + '">Edit</button>' +
+        "</div>" +
+        (current
+          ? '<p class="schedule-now">Right now: <strong>' + esc(current.responsible || "not set") +
+            "</strong>, for " + esc(current.label) + "</p>"
+          : "") +
+        (slots.length
+          ? '<div class="table-wrap"><table class="table schedule-table"><thead><tr>' +
+            '<th scope="col">Period</th><th scope="col">Responsible</th>' +
+            "</tr></thead><tbody>" + rows + "</tbody></table></div>"
+          : '<p class="link-none">No rows yet.</p>') +
+        "</article>";
+    }).join("");
+    $("schedule-empty").hidden = S.schedules.length > 0;
+  }
+
+  // Editor for the rows of a schedule. Same reorder behaviour as documents.
+  const slotEditor = (function () {
+    let draft = [];
+    let removed = [];
+    let dragFrom = null;
+
+    function move(from, to) {
+      if (to < 0 || to >= draft.length) return;
+      draft.splice(to, 0, draft.splice(from, 1)[0]);
+      render();
+    }
+    function monthOptions(sel) {
+      return '<option value="">Month</option>' + MONTHS.map((m, i) =>
+        '<option value="' + (i + 1) + '"' + (Number(sel) === i + 1 ? " selected" : "") + ">" +
+        m + "</option>").join("");
+    }
+    function render() {
+      const el = $("cf-slots");
+      if (!draft.length) { el.innerHTML = '<p class="link-none">No rows yet.</p>'; return; }
+      el.innerHTML = draft.map((s, i) =>
+        '<div class="doc-row" draggable="true" data-i="' + i + '">' +
+          '<span class="doc-grip" aria-hidden="true"><svg viewBox="0 0 16 16" width="16" height="16">' +
+            '<circle cx="6" cy="4" r="1.4" fill="currentColor"/><circle cx="10" cy="4" r="1.4" fill="currentColor"/>' +
+            '<circle cx="6" cy="8" r="1.4" fill="currentColor"/><circle cx="10" cy="8" r="1.4" fill="currentColor"/>' +
+            '<circle cx="6" cy="12" r="1.4" fill="currentColor"/><circle cx="10" cy="12" r="1.4" fill="currentColor"/>' +
+          "</svg></span>" +
+          '<div class="doc-fields slot-fields">' +
+            '<label class="field"><span class="visually-hidden">Period</span>' +
+              '<input class="input" data-f="label" data-i="' + i + '" placeholder="January/February" value="' + esc(s.label || "") + '"></label>' +
+            '<label class="field"><span class="visually-hidden">Responsible</span>' +
+              '<input class="input" data-f="responsible" data-i="' + i + '" placeholder="Apt 6" value="' + esc(s.responsible || "") + '"></label>' +
+            '<label class="field"><span class="visually-hidden">First month</span>' +
+              '<select class="input" data-f="month_start" data-i="' + i + '">' + monthOptions(s.month_start) + "</select></label>" +
+            '<label class="field"><span class="visually-hidden">Last month</span>' +
+              '<select class="input" data-f="month_end" data-i="' + i + '">' + monthOptions(s.month_end) + "</select></label>" +
+          "</div>" +
+          '<div class="doc-buttons">' +
+            '<button type="button" class="doc-btn" data-move="up" data-i="' + i + '"' + (i === 0 ? " disabled" : "") + ' aria-label="Move up">Up</button>' +
+            '<button type="button" class="doc-btn" data-move="down" data-i="' + i + '"' + (i === draft.length - 1 ? " disabled" : "") + ' aria-label="Move down">Down</button>' +
+            '<button type="button" class="doc-btn doc-rm" data-rm="' + i + '" aria-label="Remove">Remove</button>' +
+          "</div></div>").join("");
+
+      el.querySelectorAll("[data-f]").forEach((input) =>
+        input.addEventListener("input", () => {
+          const v = input.value;
+          const f = input.dataset.f;
+          draft[Number(input.dataset.i)][f] = (f === "month_start" || f === "month_end")
+            ? (v ? Number(v) : null) : v;
+        }));
+      el.querySelectorAll("[data-move]").forEach((b) =>
+        b.addEventListener("click", () => {
+          const i = Number(b.dataset.i);
+          move(i, b.dataset.move === "up" ? i - 1 : i + 1);
+        }));
+      el.querySelectorAll("[data-rm]").forEach((b) =>
+        b.addEventListener("click", () => {
+          const i = Number(b.dataset.rm);
+          if (draft[i].id) removed.push(draft[i].id);
+          draft.splice(i, 1);
+          render();
+        }));
+      el.querySelectorAll(".doc-row").forEach((row) => {
+        row.addEventListener("dragstart", (e) => {
+          dragFrom = Number(row.dataset.i);
+          row.classList.add("dragging");
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", String(dragFrom));
+        });
+        row.addEventListener("dragend", () => { row.classList.remove("dragging"); dragFrom = null; });
+        row.addEventListener("dragover", (e) => { e.preventDefault(); row.classList.add("drag-over"); });
+        row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+        row.addEventListener("drop", (e) => {
+          e.preventDefault();
+          row.classList.remove("drag-over");
+          const to = Number(row.dataset.i);
+          if (dragFrom != null && dragFrom !== to) move(dragFrom, to);
+        });
+      });
+    }
+    $("cf-slot-add").addEventListener("click", () => {
+      draft.push({ label: "", responsible: "", month_start: null, month_end: null });
+      render();
+      const inputs = $("cf-slots").querySelectorAll('input[data-f="label"]');
+      if (inputs.length) inputs[inputs.length - 1].focus();
+    });
+    return {
+      reset(existing) {
+        draft = existing.map((s) => ({
+          id: s.id, label: s.label, responsible: s.responsible,
+          month_start: s.month_start, month_end: s.month_end,
+        }));
+        removed = [];
+        render();
+      },
+      rows: () => draft.filter((s) => (s.label || "").trim()),
+      removed: () => removed,
+    };
+  })();
+
+  function openScheduleModal(sc) {
+    $("schedule-modal-title").textContent = sc ? "Edit schedule" : "Add schedule";
+    $("cf-id").value = sc ? sc.id : "";
+    $("cf-name").value = sc ? sc.name : "";
+    $("cf-desc").value = sc ? (sc.description || "") : "";
+    $("cf-delete").hidden = !sc;
+    slotEditor.reset(sc ? slotsFor(sc.id) : []);
+    openModal("schedule-modal");
+    $("cf-name").focus();
+  }
+
+  $("schedule-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const id = $("cf-id").value;
+    const row = {
+      name: $("cf-name").value.trim(),
+      description: $("cf-desc").value.trim() || null,
+    };
+    try {
+      let saved;
+      if (id) {
+        const existing = S.schedules.find((x) => x.id === id);
+        const patch = await getStore().update("schedules", id, row);
+        Object.assign(existing, patch || row);
+        saved = existing;
+      } else {
+        saved = await getStore().insert("schedules", Object.assign({ position: S.schedules.length }, row));
+        S.schedules.push(saved);
+      }
+      for (const rid of slotEditor.removed()) {
+        await getStore().remove("scheduleSlots", rid);
+        S.scheduleSlots = S.scheduleSlots.filter((x) => x.id !== rid);
+      }
+      const rows = slotEditor.rows();
+      for (let i = 0; i < rows.length; i++) {
+        const s = rows[i];
+        const patch = {
+          label: s.label.trim(), responsible: (s.responsible || "").trim() || null,
+          month_start: s.month_start || null, month_end: s.month_end || null, position: i,
+        };
+        if (s.id) {
+          const existing = S.scheduleSlots.find((x) => x.id === s.id);
+          await getStore().update("scheduleSlots", s.id, patch);
+          if (existing) Object.assign(existing, patch);
+        } else {
+          S.scheduleSlots.push(await getStore().insert("scheduleSlots",
+            Object.assign({ schedule_id: saved.id }, patch)));
+        }
+      }
+      closeModal("schedule-modal");
+      toast("Saved.");
+      renderSchedules();
+    } catch (err) { fail(err); }
+  });
+
+  $("cf-delete").addEventListener("click", async () => {
+    const id = $("cf-id").value;
+    if (!id || !confirm("Delete this schedule and all of its rows?")) return;
+    try {
+      await getStore().remove("schedules", id);
+      S.schedules = S.schedules.filter((x) => x.id !== id);
+      S.scheduleSlots = S.scheduleSlots.filter((x) => x.schedule_id !== id);
+      closeModal("schedule-modal");
+      toast("Deleted.");
+      renderSchedules();
+    } catch (e) { fail(e); }
+  });
+
+  $("btn-new-schedule").addEventListener("click", () => openScheduleModal(null));
+
+  // ------------------------------------------------------------------
+  // Reminder settings
+  // ------------------------------------------------------------------
+  const DEFAULT_SETTINGS = {
+    id: 1, reminders_enabled: false, frequency: "monthly", send_weekday: 1,
+    send_day_of_month: 1, delivery_mode: "digest", digest_email: null, last_sent_at: null,
+  };
+  const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+  function describeSchedule(s) {
+    if (!s.reminders_enabled) {
+      return "Reminder emails are off. Nothing will be sent to anyone.";
+    }
+    const when = s.frequency === "daily" ? "every day"
+      : s.frequency === "weekdays" ? "every weekday"
+      : s.frequency === "weekly" ? "every " + WEEKDAYS[s.send_weekday]
+      : "on day " + s.send_day_of_month + " of each month";
+    const who = s.delivery_mode === "digest"
+      ? "one email to " + (s.digest_email || "an address you still need to set")
+      : "each board member their own items";
+    return "Sending " + who + ", " + when + " at about 9 AM Eastern.";
+  }
+
+  function settingsFromForm() {
+    return {
+      reminders_enabled: $("sf-enabled").checked,
+      frequency: $("sf-frequency").value,
+      send_weekday: Number($("sf-weekday").value),
+      send_day_of_month: Number($("sf-monthday").value) || 1,
+      delivery_mode: $("sf-mode").value,
+      digest_email: $("sf-digest").value.trim() || null,
+    };
+  }
+
+  function renderSettings() {
+    const s = S.settings || DEFAULT_SETTINGS;
+    $("sf-enabled").checked = !!s.reminders_enabled;
+    $("sf-frequency").value = s.frequency;
+    $("sf-weekday").value = String(s.send_weekday);
+    $("sf-monthday").value = s.send_day_of_month;
+    $("sf-mode").value = s.delivery_mode;
+    $("sf-digest").value = s.digest_email || "";
+    refreshSettingsVisibility();
+  }
+
+  // Show only the fields that matter for the current choices, and keep the
+  // summary line at the top honest about what will happen.
+  function refreshSettingsVisibility() {
+    const live = Object.assign({}, S.settings, settingsFromForm());
+    $("sf-weekday-field").hidden = live.frequency !== "weekly";
+    $("sf-monthday-field").hidden = live.frequency !== "monthly";
+    $("sf-digest-field").hidden = live.delivery_mode !== "digest";
+    $("sf-mode-note").textContent = live.delivery_mode === "digest"
+      ? "This works on the free Resend plan, as long as the address above is the one the Resend account was created with."
+      : "This needs a domain you own, verified in Resend. Without one, Resend will refuse to deliver to anyone but your own account address.";
+    $("settings-summary").textContent = describeSchedule(live);
+    $("settings-status").className = "settings-status " + (live.reminders_enabled ? "is-on" : "is-off");
+    $("sf-test").disabled = live.delivery_mode === "digest" && !live.digest_email;
+  }
+
+  ["sf-enabled", "sf-frequency", "sf-weekday", "sf-monthday",
+   "sf-mode", "sf-digest"].forEach((id) =>
+    $(id).addEventListener("input", refreshSettingsVisibility));
+
+  $("settings-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const row = settingsFromForm();
+    if (row.reminders_enabled && row.delivery_mode === "digest" && !row.digest_email) {
+      toast("Add an address to send the digest to, or turn reminders off.", true);
+      $("sf-digest").focus();
+      return;
+    }
+    try {
+      const patch = await getStore().update("settings", 1, row);
+      Object.assign(S.settings, patch || row);
+      renderSettings();
+      toast(row.reminders_enabled ? "Settings saved. Reminders are on." : "Settings saved. Reminders stay off.");
+    } catch (err) { fail(err); }
+  });
+
+  // Calls the Edge Function. Preview builds the email and shows it exactly as
+  // it will arrive. Send now delivers it, ignoring the schedule and the on
+  // and off switch.
+  async function callReminderFunction(mode) {
+    const box = $("sf-preview-box");
+    const body = $("sf-preview-body");
+    const frame = $("sf-preview-frame");
+    box.hidden = false;
+    frame.hidden = true;
+    $("sf-preview-title").textContent = mode === "dry" ? "Email preview" : "Sending";
+
+    if (demoMode) {
+      body.innerHTML = '<p class="muted">This needs the live database. ' +
+        "Connect Supabase in config.js and the preview will build the real email.</p>";
+      return;
+    }
+    body.innerHTML = '<p class="muted">Working.</p>';
+    try {
+      const url = CFG.SUPABASE_URL.replace(/\/$/, "") +
+        "/functions/v1/send-reminders?" + (mode === "dry" ? "dry=1" : "force=1");
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + CFG.SUPABASE_ANON_KEY,
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await resp.json();
+      if (data.error) {
+        body.innerHTML = '<p class="muted">The function returned an error: ' + esc(String(data.error)) +
+          "</p><p class=\"muted\">If it mentions RESEND_API_KEY, that secret is not set yet. " +
+          "The preview works without it, but sending does not. See the README.</p>";
+        return;
+      }
+      if (mode === "dry") {
+        const to = (data.recipients || []).map((r) => r.to).join(", ");
+        const c = data.counts || {};
+        body.innerHTML =
+          "<p><strong>To:</strong> " + esc(to || "nobody, no address is set") + "<br>" +
+          "<strong>Subject:</strong> " + esc(data.subject || "") + "<br>" +
+          "<strong>Covering:</strong> " + esc(data.months || "") + "</p>" +
+          "<p class=\"muted\">" + (c.overdue || 0) + " overdue, " + (c.ahead || 0) +
+          " in the detailed month, " + (c.after || 0) + " in the short list. Nothing has been sent.</p>";
+        // srcdoc with an empty sandbox renders the email without running anything.
+        frame.srcdoc = data.html || "<p>Nothing to show.</p>";
+        frame.hidden = false;
+      } else {
+        const sent = data.sent || 0;
+        body.innerHTML = sent
+          ? "<p>Sent " + sent + " " + (sent === 1 ? "email" : "emails") + ". Check the inbox.</p>"
+          : "<p>Nothing was sent. " + esc(data.skipped || data.error || "No recipient is set.") + "</p>";
+        if (sent) {
+          // S.settings can be missing if the initial load failed, so guard it.
+          if (S.settings) S.settings.last_sent_at = new Date().toISOString();
+          toast("Email sent.");
+        }
+      }
+    } catch (err) {
+      body.innerHTML = '<p class="muted">Could not reach the function. It may not be deployed yet. Error: ' +
+        esc(err.message) + "</p>";
+    }
+  }
+
+  $("sf-preview-close").addEventListener("click", () => {
+    $("sf-preview-box").hidden = true;
+    $("sf-preview").focus();
+  });
+
+  $("sf-preview").addEventListener("click", () => callReminderFunction("dry"));
+  $("sf-test").addEventListener("click", () => {
+    const to = $("sf-digest").value.trim() || "the address on file";
+    if (!confirm("Send the summary to " + to + " right now? This ignores the schedule and " +
+                 "the on and off switch, and delivers a real email.")) return;
+    callReminderFunction("force");
+  });
+
+  const VIEWS = ["dashboard", "tasks", "vendors", "accounts", "board", "schedules", "settings"];
 
   // The tabs appear twice, once in the top bar and once in the mobile
   // sidebar, so both copies are kept in step.
@@ -811,6 +1309,8 @@
     if (vc) { const v = vendorById(vc.dataset.vendor); if (v) openVendorModal(v); return; }
     const ac = e.target.closest("[data-account]");
     if (ac) { const a = accountById(ac.dataset.account); if (a) openAccountModal(a); return; }
+    const sc = e.target.closest("[data-schedule]");
+    if (sc) { const x = S.schedules.find((y) => y.id === sc.dataset.schedule); if (x) openScheduleModal(x); return; }
     const mc = e.target.closest("[data-member]");
     if (mc) { const m = memberById(mc.dataset.member); if (m) openMemberModal(m); return; }
   });
@@ -874,10 +1374,18 @@
     try {
       S = await getStore().load();
       S.accounts = S.accounts || [];
+      S.settings = Object.assign({}, DEFAULT_SETTINGS, S.settings || {});
+      S.schedules = S.schedules || [];
+      S.scheduleSlots = S.scheduleSlots || [];
       renderFilterOptions();
       renderAll();
     } catch (e) {
       fail(e);
+      // Keep the settings form consistent rather than stuck on its loading text.
+      renderSettings();
+      $("settings-summary").textContent =
+        "Could not load the saved settings, so this form is showing defaults. Do not save until the page loads cleanly.";
+      $("settings-status").className = "settings-status is-off";
       $("stats").innerHTML = '<div class="stat" style="grid-column:1/-1"><div class="lbl">' +
         "Could not load the data. Check the Supabase address and key in config.js, and make sure the " +
         "migrations have been applied. See the README. Error: " + esc(e.message) + "</div></div>";
