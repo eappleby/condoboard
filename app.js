@@ -76,7 +76,7 @@
     const scheduleSlots = [1, 3, 5, 7, 9, 11].map((mo, i) => ({
       id: uid(), schedule_id: schedules[0].id,
       label: MONTHS_SEED[mo - 1] + "/" + MONTHS_SEED[mo],
-      responsible: "Apt " + (i + 1), month_start: mo, month_end: mo + 1, position: i,
+      responsible: String(i + 1), month_start: mo, month_end: mo + 1, position: i,
     }));
     const fixtures = [
       { id: uid(), name: "Sample Paint", category: "Paint", brand: "Sample Brand", code: "123",
@@ -1354,6 +1354,17 @@
     return month >= slot.month_start || month <= slot.month_end;
   }
 
+  // A slot's period is named from its months, so there is nothing to type.
+  function periodLabel(start, end) {
+    if (!start) return "";
+    if (!end || end === start) return MONTHS[start - 1];
+    if (end === start % 12 + 1) return MONTHS[start - 1] + "/" + MONTHS[end - 1];
+    return MONTHS[start - 1] + " to " + MONTHS[end - 1];
+  }
+  function slotPeriod(s) { return periodLabel(s.month_start, s.month_end) || s.label || ""; }
+  // Apartment numbers are stored bare. Older rows may still say "Apt 6".
+  function apartment(v) { return String(v || "").replace(/^\s*apt\.?\s*/i, "").trim(); }
+
   function renderSchedules() {
     const month = new Date().getMonth() + 1;
     const list = S.schedules.slice().sort((a, b) => (a.position || 0) - (b.position || 0));
@@ -1363,8 +1374,8 @@
       const rows = slots.map((s) => {
         const on = current && s.id === current.id;
         return '<tr class="' + (on ? "slot-current" : "") + '">' +
-          "<td>" + esc(s.label) + (on ? ' <span class="badge badge-open">This month</span>' : "") + "</td>" +
-          "<td>" + esc(s.responsible || "Not set") + "</td></tr>";
+          "<td>" + esc(slotPeriod(s)) + (on ? ' <span class="badge badge-open">This month</span>' : "") + "</td>" +
+          "<td>" + esc(apartment(s.responsible) || "Not set") + "</td></tr>";
       }).join("");
       return '<article class="schedule-card tone-green">' +
         '<div class="schedule-head">' +
@@ -1373,12 +1384,12 @@
           '<button type="button" class="btn" data-schedule="' + sc.id + '">Edit</button>' +
         "</div>" +
         (current
-          ? '<p class="schedule-now">Right now: <strong>' + esc(current.responsible || "not set") +
-            "</strong>, for " + esc(current.label) + "</p>"
+          ? '<p class="schedule-now">Right now: apartment <strong>' + esc(apartment(current.responsible) || "not set") +
+            "</strong>, " + esc(slotPeriod(current)) + "</p>"
           : "") +
         (slots.length
           ? '<div class="table-wrap"><table class="table schedule-table"><thead><tr>' +
-            '<th scope="col">Period</th><th scope="col">Responsible</th>' +
+            '<th scope="col">Period</th><th scope="col">Apartment</th>' +
             "</tr></thead><tbody>" + rows + "</tbody></table></div>"
           : '<p class="link-none">No rows yet.</p>') +
         "</article>";
@@ -1386,7 +1397,8 @@
     $("schedule-empty").hidden = S.schedules.length > 0;
   }
 
-  // Editor for the rows of a schedule. Same reorder behaviour as documents.
+  // Editor for the rows of a schedule: apartment, first month, last month.
+  // Rows reorder by dragging only and remove with the x, by Evan's choice.
   const slotEditor = (function () {
     let draft = [];
     let removed = [];
@@ -1397,8 +1409,8 @@
       draft.splice(to, 0, draft.splice(from, 1)[0]);
       render();
     }
-    function monthOptions(sel) {
-      return '<option value="">Month</option>' + MONTHS.map((m, i) =>
+    function monthOptions(sel, blank) {
+      return '<option value="">' + blank + "</option>" + MONTHS.map((m, i) =>
         '<option value="' + (i + 1) + '"' + (Number(sel) === i + 1 ? " selected" : "") + ">" +
         m + "</option>").join("");
     }
@@ -1406,27 +1418,24 @@
       const el = $("cf-slots");
       if (!draft.length) { el.innerHTML = '<p class="link-none">No rows yet.</p>'; return; }
       el.innerHTML = draft.map((s, i) =>
-        '<div class="doc-row" draggable="true" data-i="' + i + '">' +
+        '<div class="doc-row slot-row" draggable="true" data-i="' + i + '">' +
           '<span class="doc-grip" aria-hidden="true"><svg viewBox="0 0 16 16" width="16" height="16">' +
             '<circle cx="6" cy="4" r="1.4" fill="currentColor"/><circle cx="10" cy="4" r="1.4" fill="currentColor"/>' +
             '<circle cx="6" cy="8" r="1.4" fill="currentColor"/><circle cx="10" cy="8" r="1.4" fill="currentColor"/>' +
             '<circle cx="6" cy="12" r="1.4" fill="currentColor"/><circle cx="10" cy="12" r="1.4" fill="currentColor"/>' +
           "</svg></span>" +
           '<div class="doc-fields slot-fields">' +
-            '<label class="field"><span class="visually-hidden">Period</span>' +
-              '<input class="input" data-f="label" data-i="' + i + '" placeholder="January/February" value="' + esc(s.label || "") + '"></label>' +
-            '<label class="field"><span class="visually-hidden">Responsible</span>' +
-              '<input class="input" data-f="responsible" data-i="' + i + '" placeholder="Apt 6" value="' + esc(s.responsible || "") + '"></label>' +
+            '<label class="field"><span class="visually-hidden">Apartment</span>' +
+              '<input class="input" data-f="responsible" data-i="' + i + '" placeholder="Apartment" value="' + esc(apartment(s.responsible)) + '"></label>' +
             '<label class="field"><span class="visually-hidden">First month</span>' +
-              '<select class="input" data-f="month_start" data-i="' + i + '">' + monthOptions(s.month_start) + "</select></label>" +
+              '<select class="input" data-f="month_start" data-i="' + i + '">' + monthOptions(s.month_start, "From") + "</select></label>" +
             '<label class="field"><span class="visually-hidden">Last month</span>' +
-              '<select class="input" data-f="month_end" data-i="' + i + '">' + monthOptions(s.month_end) + "</select></label>" +
+              '<select class="input" data-f="month_end" data-i="' + i + '">' + monthOptions(s.month_end, "To") + "</select></label>" +
           "</div>" +
-          '<div class="doc-buttons">' +
-            '<button type="button" class="doc-btn" data-move="up" data-i="' + i + '"' + (i === 0 ? " disabled" : "") + ' aria-label="Move up">Up</button>' +
-            '<button type="button" class="doc-btn" data-move="down" data-i="' + i + '"' + (i === draft.length - 1 ? " disabled" : "") + ' aria-label="Move down">Down</button>' +
-            '<button type="button" class="doc-btn doc-rm" data-rm="' + i + '" aria-label="Remove">Remove</button>' +
-          "</div></div>").join("");
+          '<button type="button" class="row-x" data-rm="' + i + '" aria-label="Remove row">' +
+            '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">' +
+            '<path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
+          "</div>").join("");
 
       el.querySelectorAll("[data-f]").forEach((input) =>
         input.addEventListener("input", () => {
@@ -1434,11 +1443,6 @@
           const f = input.dataset.f;
           draft[Number(input.dataset.i)][f] = (f === "month_start" || f === "month_end")
             ? (v ? Number(v) : null) : v;
-        }));
-      el.querySelectorAll("[data-move]").forEach((b) =>
-        b.addEventListener("click", () => {
-          const i = Number(b.dataset.i);
-          move(i, b.dataset.move === "up" ? i - 1 : i + 1);
         }));
       el.querySelectorAll("[data-rm]").forEach((b) =>
         b.addEventListener("click", () => {
@@ -1468,7 +1472,7 @@
     $("cf-slot-add").addEventListener("click", () => {
       draft.push({ label: "", responsible: "", month_start: null, month_end: null });
       render();
-      const inputs = $("cf-slots").querySelectorAll('input[data-f="label"]');
+      const inputs = $("cf-slots").querySelectorAll('input[data-f="responsible"]');
       if (inputs.length) inputs[inputs.length - 1].focus();
     });
     return {
@@ -1480,7 +1484,7 @@
         removed = [];
         render();
       },
-      rows: () => draft.filter((s) => (s.label || "").trim()),
+      rows: () => draft.filter((s) => s.month_start || apartment(s.responsible)),
       removed: () => removed,
     };
   })();
@@ -1522,7 +1526,8 @@
       for (let i = 0; i < rows.length; i++) {
         const s = rows[i];
         const patch = {
-          label: s.label.trim(), responsible: (s.responsible || "").trim() || null,
+          label: periodLabel(s.month_start, s.month_end) || (s.label || "").trim(),
+          responsible: apartment(s.responsible) || null,
           month_start: s.month_start || null, month_end: s.month_end || null, position: i,
         };
         if (s.id) {

@@ -63,7 +63,8 @@ sample data and nothing is saved.
   intercom, appliances. Each one can carry a picture, uploaded or linked,
   and documents.
 * **Schedules.** Rotating duties such as the trash and recycling roster.
-  Give a row its months and the site marks whose turn it is right now.
+  Each row is an apartment and its months, dragged into order, and the site
+  marks whose turn it is right now.
 * **Settings.** Monthly or Never, the day it goes out, and a preview.
 * **Monthly summary email.** Off until you switch it on. It opens with the
   logo and three counters, then who is up for each schedule such as the

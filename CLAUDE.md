@@ -335,8 +335,13 @@ keyboard or a screen reader, so both paths must keep working. There is no
 document type dropdown any more, and new rows are saved with kind
 `document`. Rows with an empty address are dropped on save.
 
-The schedule slot editor in the Schedules tab repeats the same pattern.
-Slots carry optional `month_start` and `month_end`, and `isCurrentSlot()`
+The schedule slot editor in the Schedules tab is leaner, by Evan's choice.
+A row is an apartment, a first month and a last month, reordered by
+dragging only, with no up and down buttons, and removed with the x on the
+right. There is no period field: `periodLabel()` names it from the months,
+such as "January/February", and that is saved to `label` as well. The
+apartment is stored as a bare number, since "Apt" is implied, and
+`apartment()` strips the prefix from any older value. `isCurrentSlot()`
 marks whoever is up this month. It handles ranges that wrap past December.
 
 ## Conventions and gotchas
@@ -378,7 +383,8 @@ view including which of the badge and done button show, reassigning a
 role and checking the member's list follows, links add and remove, the
 Filter button and its filters, sorting by each heading in both directions, Escape closing a
 dialog, the settings form including the live summary and the guard on an empty
-digest address, document reorder and rename round trips, schedule editing,
+digest address, document reorder and rename round trips, schedule editing including drag
+reorder and the x,
 and the mobile viewport.
 
 The container blocks jsDelivr, so `window.supabase` is undefined here and any
