@@ -441,6 +441,17 @@
     status: (t) => ({ open: 0, in_progress: 0, done: 1, canceled: 2 })[t.status],
   };
 
+  // The vendor and account a responsibility is done with, each linking to
+  // its record. The links go through route(), so the dialog opens on top.
+  function refLinks(t) {
+    const v = vendorById(t.vendor_id);
+    const a = accountById(t.account_id);
+    const bits = [];
+    if (v) bits.push('<span class="t-ref"><span class="t-ref-lbl">Vendor</span> <a href="#vendor/' + v.id + '">' + esc(v.name) + "</a></span>");
+    if (a) bits.push('<span class="t-ref"><span class="t-ref-lbl">Account</span> <a href="#account/' + a.id + '">' + esc(a.name) + "</a></span>");
+    return bits.length ? '<div class="t-refs">' + bits.join("") + "</div>" : "";
+  }
+
   function renderTaskTable() {
     const search = $("task-search").value.trim().toLowerCase();
     const fStatus = $("filter-status").value;
@@ -494,6 +505,7 @@
       return '<tr class="' + rowCls + '" data-task="' + t.id + '">' +
         '<td><div class="t-title">' + esc(t.title) + "</div>" +
           (t.description ? '<div class="t-desc">' + esc(t.description) + "</div>" : "") +
+          refLinks(t) +
           linkChips(linksFor("task", t.id)) + "</td>" +
         "<td>" + esc(firstName(t)) + "</td>" +
         '<td class="t-date ' + (!done && due.cls ? "due-" + due.cls : "") + '" title="' + esc(due.text) + '">' +

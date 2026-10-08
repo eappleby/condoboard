@@ -362,6 +362,9 @@ textarea.input { min-height: 80px; }
 .table tbody tr.row-soon { border-left: 6px solid var(--amber); }
 .table tbody tr.row-plain { border-left: 6px solid transparent; }
 .table .t-title { font-weight: 700; }
+.t-refs { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; font-size: 14px; }
+.t-ref-lbl { color: var(--text-soft); }
+.t-ref a { color: var(--primary-dark); font-weight: 600; }
 .table .t-desc { color: var(--text-soft); font-size: 14px; margin-top: 4px; max-width: 46ch; }
 .table .due-overdue { color: var(--red); font-weight: 700; }
 .table .due-soon { color: var(--amber); font-weight: 700; }

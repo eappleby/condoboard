@@ -82,7 +82,9 @@ columns for a vendor with no contacts.
 
 A responsibility can also point at the account or city portal it is done
 through, with `responsibilities.account_id`, chosen in its dialog next to
-Status. Deleting an account clears it. The email shows it under the
+Status. On the Responsibilities table, `refLinks()` names the vendor and
+account under the title as `#vendor/<id>` and `#account/<id>` links, which
+`route()` turns into that record's dialog. Deleting an account clears it. The email shows it under the
 responsibility with a link to the account on the site and to the portal.
 
 `accounts` has no password column and must not get one. The database is
