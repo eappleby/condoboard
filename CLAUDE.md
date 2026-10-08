@@ -116,7 +116,9 @@ content can be tested with Deno without touching the network. Run
 them. The `Deno.serve` call is guarded by `import.meta.main`, so importing
 the module in a test does not start a server.
 
-Structure: a header with the logo, the name and three counters, then one
+Structure: a header with the logo, the name and three counters, then a
+Schedules table naming who is up for each rotation in the month ahead and
+the month after, such as the apartment on trash, then one
 table listing everything overdue, due in the month ahead and due in the
 month after, then overdue in full and the month ahead in full. The month
 after appears only in the table. Empty sections are left out, and there is
@@ -133,6 +135,12 @@ address and falls back to `DEFAULT_APP_URL`.
 There is no Deno in the container. To test, copy `index.ts` without the
 `npm:` import line and import `buildDigest` from a script run with
 `node --experimental-strip-types`.
+
+The Schedules table comes from `schedules` and `schedule_slots`, passed to
+`buildDigest()` as `opts.schedules`. `slotFor()` repeats the site's
+`isCurrentSlot()` rule, so keep the two in step. A schedule with no slot for
+either month is left out, and a failed schedules query does not stop the
+email.
 
 `coveredMonths()` decides which months those are. On or before
 the 20th the detailed month is the current one, from the 21st it rolls to the
@@ -208,6 +216,19 @@ The Board tab has a Roles grid and a Members grid. Role cards open the role
 modal. Member cards are not buttons, because they hold two buttons of their
 own: Responsibilities, which lists that person's open items under the grid
 through `boardMemberId`, and Edit.
+
+## Colour
+
+Every tab uses the dashboard's palette. A `tone-amber`, `tone-blue`,
+`tone-purple`, `tone-green` or `tone-slate` class sets `--tone`,
+`--tone-soft` and `--tone-line`, and `.group-heading`, `.info-card`,
+`.schedule-card` and `.settings-block` inside it pick them up for the label,
+the left edge and the subtitle. There is no red tone, because red means
+overdue. Vendors are green when contracted and blue when recommended, roles
+purple, members blue. Accounts and fixtures take a tone from their category
+through `ACCOUNT_TONE` and `FIXTURE_TONE`, falling back to blue. Category
+badges on responsibilities stay neutral so they do not compete with the
+status colours. New tones must meet AA on white and on their own tint.
 
 ## Logo
 

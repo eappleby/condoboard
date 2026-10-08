@@ -97,7 +97,7 @@ body.locked > .topbar, body.locked > .container, body.locked > .demo-banner { di
 }
 .demo-banner code { background: #f8e2bf; padding: 2px 6px; border-radius: 4px; }
 
-.topbar { background: var(--surface); border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 50; }
+.topbar { background: var(--surface); border-bottom: 3px solid var(--primary); position: sticky; top: 0; z-index: 50; }
 .topbar-inner {
   max-width: 1240px; margin: 0 auto; padding: 12px 20px;
   display: flex; align-items: center; gap: 20px;
@@ -166,10 +166,23 @@ body.locked > .topbar, body.locked > .container, body.locked > .demo-banner { di
 .section-head { display: flex; align-items: center; justify-content: flex-end; gap: 20px; flex-wrap: wrap; }
 .section-desc { color: var(--text-soft); margin: 0; max-width: 68ch; }
 .empty-note { color: var(--text-soft); text-align: center; padding: 40px 0; }
+/* Section colours. A tone class sets three variables, and headings, cards
+   and blocks inside pick them up. Each tone meets AA on white and on its
+   own tint. Red is kept for overdue. */
+.tone-amber  { --tone: var(--amber);        --tone-soft: var(--amber-soft);   --tone-line: #e0bd8c; }
+.tone-blue   { --tone: var(--primary-dark); --tone-soft: var(--primary-soft); --tone-line: #b7c9f2; }
+.tone-purple { --tone: var(--purple);       --tone-soft: var(--purple-soft);  --tone-line: #cbb6f0; }
+.tone-green  { --tone: var(--green);        --tone-soft: var(--green-soft);   --tone-line: #a9d5b7; }
+.tone-slate  { --tone: var(--slate);        --tone-soft: var(--slate-soft);   --tone-line: var(--border-strong); }
+
+/* Same look as the dashboard's status labels. */
 .group-heading {
-  font-size: 15px; text-transform: uppercase; letter-spacing: .06em;
-  color: var(--text-soft); margin: 26px 0 12px;
-  border-bottom: 2px solid var(--border); padding-bottom: 8px;
+  width: fit-content; margin: 26px 0 12px;
+  font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  border-radius: 6px; padding: 5px 12px;
+  background: var(--tone-soft, var(--slate-soft));
+  color: var(--tone, var(--slate));
+  border: 1px solid var(--tone-line, var(--border-strong));
 }
 .inline-note {
   margin: 0; background: var(--surface-alt); border-left: 4px solid var(--border-strong);
@@ -314,7 +327,7 @@ textarea.input { min-height: 80px; }
 .table { width: 100%; border-collapse: collapse; min-width: 940px; }
 .table th {
   text-align: left; font-size: 14px; text-transform: uppercase; letter-spacing: .05em;
-  color: var(--text-soft); padding: 14px; border-bottom: 2px solid var(--border); background: var(--surface-alt);
+  color: var(--primary-dark); padding: 14px; border-bottom: 2px solid #b7c9f2; background: var(--primary-soft);
 }
 .table .col-title { width: 32%; }
 .table td { padding: 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
@@ -349,18 +362,19 @@ textarea.input { min-height: 80px; }
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
 .info-card {
   background: var(--surface); border: 1px solid var(--border);
+  border-left: 6px solid var(--tone, var(--border-strong));
   border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow);
   cursor: pointer; text-align: left; font-family: inherit; font-size: 16px;
   color: var(--text); width: 100%; display: block;
 }
-.info-card:hover { background: var(--surface-alt); border-color: var(--border-strong); }
+.info-card:hover { background: var(--surface-alt); border-color: var(--border-strong); border-left-color: var(--tone, var(--border-strong)); }
 .info-card-static { cursor: default; }
-.info-card-static:hover { background: var(--surface); border-color: var(--border); }
+.info-card-static:hover { background: var(--surface); border-color: var(--border); border-left-color: var(--tone, var(--border-strong)); }
 .card-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
 .role-name { font-weight: 700; color: var(--text); }
 #member-tasks-title:focus-visible { box-shadow: none; }
 .info-card h3 { margin: 0 0 4px; font-size: 18px; }
-.info-card .sub { color: var(--text-soft); font-size: 15px; margin-bottom: 10px; }
+.info-card .sub { color: var(--tone, var(--text-soft)); font-weight: 600; font-size: 15px; margin-bottom: 10px; }
 .contact-line { font-size: 15px; color: var(--text-soft); margin-top: 6px; }
 .contact-line .lbl { font-weight: 600; color: var(--text); }
 .contact-line a { color: var(--primary-dark); }
@@ -371,7 +385,7 @@ textarea.input { min-height: 80px; }
 
 .settings-form { display: flex; flex-direction: column; gap: 20px; max-width: 780px; }
 .settings-block {
-  border: 2px solid var(--border); border-radius: 10px; padding: 18px; margin: 0;
+  border: 2px solid var(--border); border-left: 6px solid var(--tone, var(--border)); border-radius: 10px; padding: 18px; margin: 0;
   background: var(--surface); display: flex; flex-direction: column; gap: 14px;
 }
 .settings-block legend { font-size: 16px; font-weight: 700; padding: 0 8px; }
@@ -404,7 +418,8 @@ textarea.input { min-height: 80px; }
 .modal-sm { max-width: 480px; }
 .modal-head {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 20px 24px; border-bottom: 2px solid var(--border);
+  padding: 20px 24px; border-bottom: 2px solid #b7c9f2;
+  background: var(--primary-soft); border-radius: 14px 14px 0 0;
 }
 .modal-head h2 { margin: 0; font-size: 20px; }
 .modal-body { padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 16px; }
@@ -446,6 +461,7 @@ textarea.input { min-height: 80px; }
 /* ---------- schedules ---------- */
 .schedule-card {
   background: var(--surface); border: 1px solid var(--border);
+  border-left: 6px solid var(--tone, var(--border-strong));
   border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin-bottom: 18px;
 }
 .schedule-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }

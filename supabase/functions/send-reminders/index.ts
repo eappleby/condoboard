@@ -8,6 +8,8 @@
 //
 // The email has four parts:
 //   Header           logo, name, and three counters like the dashboard's
+//   Schedules        who is up for each rotation, such as the apartment on
+//                    trash, in the month ahead and the month after
 //   Table            everything overdue, due in the month ahead, and due in
 //                    the month after, one row each
 //   Overdue          full detail, however far past it is
@@ -53,6 +55,21 @@ export type Task = {
   vendor: Vendor | null;
   links: { title: string | null; url: string; sort_order: number | null }[] | null;
 };
+
+/** A rotation from the Schedules tab, such as trash and recycling. */
+export type Schedule = {
+  name: string;
+  position?: number | null;
+  schedule_slots: {
+    label: string;
+    responsible: string | null;
+    month_start: number | null;
+    month_end: number | null;
+    position?: number | null;
+  }[] | null;
+};
+
+type DigestOpts = { now: Date; appUrl?: string | null; schedules?: Schedule[] | null };
 
 export type Settings = {
   reminders_enabled: boolean;
@@ -168,6 +185,7 @@ const TONE = {
   overdue: { fg: "#b3261e", bg: "#fdeceb", line: "#e8b4b0" },
   ahead:   { fg: "#8a4b08", bg: "#fdf1e1", line: "#e0bd8c" },
   after:   { fg: "#16389f", bg: "#e8eefc", line: "#b7c9f2" },
+  done:    { fg: "#15662f", bg: "#e6f4ea", line: "#a9d5b7" },
 };
 type ToneName = keyof typeof TONE;
 
@@ -206,6 +224,41 @@ function sectionHead(text: string, tone: ToneName): string {
   return `<p style="margin:28px 0 12px"><span style="display:inline-block;background:${c.bg};color:${c.fg};` +
     `border:1px solid ${c.line};border-radius:6px;padding:5px 12px;font-size:14px;font-weight:bold;` +
     `text-transform:uppercase;letter-spacing:.05em">${escapeHtml(text)}</span></p>`;
+}
+
+/** Whoever is up for a schedule in a given month, 1 to 12. Same rule as the site. */
+function slotFor(sc: Schedule, month: number) {
+  const slots = (sc.schedule_slots || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0));
+  return slots.find((s) => {
+    if (!s.month_start || !s.month_end) return false;
+    return s.month_start <= s.month_end
+      ? month >= s.month_start && month <= s.month_end
+      : month >= s.month_start || month <= s.month_end;
+  }) || null;
+}
+
+/** Who is scheduled for each rotation in the two months the email covers. */
+function scheduleTable(schedules: Schedule[], aheadMonth: string, aheadNum: number, afterMonth: string, afterNum: number): string {
+  const rows = schedules.slice().sort((a, b) => (a.position || 0) - (b.position || 0))
+    .map((sc) => ({ sc, a: slotFor(sc, aheadNum), b: slotFor(sc, afterNum) }))
+    .filter((x) => x.a || x.b);
+  if (!rows.length) return "";
+  const g = TONE.done;
+  const th = `style="text-align:left;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:${g.fg};` +
+    `padding:12px 10px;border-bottom:2px solid ${g.line};background:${g.bg}"`;
+  const who = (s: ReturnType<typeof slotFor>) => s
+    ? `<div style="font-weight:bold;color:#16202b">${escapeHtml(s.responsible || "Not set")}</div>` +
+      `<div style="color:#47576a;font-size:14px;margin-top:2px">${escapeHtml(s.label)}</div>`
+    : `<span style="color:#47576a">Not set</span>`;
+  return `<h2 style="font-size:18px;margin:28px 0 12px;color:#16202b">Schedules</h2>` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;background:#ffffff;border:1px solid #cfd8e3;border-radius:10px;overflow:hidden">` +
+    `<tr><th ${th}>Schedule</th><th ${th}>${escapeHtml(aheadMonth)}</th><th ${th}>${escapeHtml(afterMonth)}</th></tr>` +
+    rows.map((x, i) => {
+      const cell = `padding:12px 10px;vertical-align:top;font-size:15px;line-height:1.4;overflow-wrap:anywhere;` +
+        (i === rows.length - 1 ? "" : "border-bottom:1px solid #cfd8e3;");
+      return `<tr><td style="${cell}border-left:6px solid ${g.fg};font-weight:bold;color:#16202b">${escapeHtml(x.sc.name)}</td>` +
+        `<td style="${cell}">${who(x.a)}</td><td style="${cell}">${who(x.b)}</td></tr>`;
+    }).join("") + `</table>`;
 }
 
 /** One row of the summary table. */
@@ -269,7 +322,7 @@ function detailedItem(t: Task, today: string, tone: ToneName): string {
  */
 export function buildDigest(
   tasks: Task[],
-  opts: { now: Date; appUrl?: string | null },
+  opts: DigestOpts,
 ): { html: string; subject: string; taskIds: string[]; counts: { overdue: number; ahead: number; after: number } } {
   const today = iso(opts.now);
   const { aheadStart, aheadEnd, afterEnd, aheadName, afterName } = coveredMonths(opts.now);
@@ -315,6 +368,8 @@ export function buildDigest(
     : `<p ${L.row}>Nothing is overdue, and nothing is due through ${escapeHtml(afterName)}.</p>`;
 
   const parts: string[] = [header, stats];
+  const afterNum = (aheadStart.getUTCMonth() + 1) % 12 + 1;
+  parts.push(scheduleTable(opts.schedules || [], aheadMonth, aheadStart.getUTCMonth() + 1, afterMonth, afterNum));
   parts.push(`<h2 style="font-size:18px;margin:28px 0 12px;color:#16202b">Upcoming responsibilities</h2>`);
   parts.push(table);
   if (overdue.length) {
@@ -345,7 +400,7 @@ ${parts.join("\n")}
 }
 
 /** Who the digest goes to. */
-export function buildMessages(tasks: Task[], s: Settings, opts: { now: Date; appUrl?: string | null }): Message[] {
+export function buildMessages(tasks: Task[], s: Settings, opts: DigestOpts): Message[] {
   const digest = buildDigest(tasks, opts);
   if (s.delivery_mode === "per_person") {
     const byEmail = new Map<string, Task[]>();
@@ -419,11 +474,18 @@ if (import.meta.main) {
       if (error) throw error;
       const tasks = (data ?? []) as unknown as Task[];
 
+      // Not fatal. The email still goes out without the rotation table.
+      const { data: sched } = await supabase
+        .from("schedules")
+        .select("name,position,schedule_slots(label,responsible,month_start,month_end,position)");
+      const schedules = (sched ?? []) as unknown as Schedule[];
+
       const appUrl = Deno.env.get("APP_URL") ?? null;
-      const messages = buildMessages(tasks, settings, { now, appUrl });
+      const opts = { now, appUrl, schedules };
+      const messages = buildMessages(tasks, settings, opts);
 
       if (dry) {
-        const digest = buildDigest(tasks, { now, appUrl });
+        const digest = buildDigest(tasks, opts);
         return json({
           preview: true,
           enabled: settings.reminders_enabled,

@@ -389,6 +389,14 @@
     $("task-empty").hidden = rows.length > 0;
   }
 
+  // Section colours, from the same palette as the dashboard. Red is left
+  // out because it means overdue.
+  const ACCOUNT_TONE = { "utilities": "amber", "city portal": "blue", "financial": "green",
+    "communications": "purple", "building systems": "slate" };
+  const FIXTURE_TONE = { "paint": "purple", "lighting": "amber", "hardware": "slate",
+    "intercom": "blue", "appliances": "green" };
+  function toneFor(map, key) { return map[String(key || "").trim().toLowerCase()] || "blue"; }
+
   function vendorCard(v) {
     const lines = [];
     if (v.contact_name) lines.push('<div class="contact-line"><span class="lbl">Contact:</span> ' + esc(v.contact_name) + "</div>");
@@ -399,7 +407,8 @@
       lines.push('<div class="contact-line"><span class="lbl">Cost:</span> ' + esc(fmtMoney(v.cost)) +
         (v.cost_period ? " " + esc(v.cost_period) : "") + "</div>");
     }
-    return '<button type="button" class="info-card" data-vendor="' + v.id + '">' +
+    const tone = v.status === "recommended" ? "blue" : v.status === "past" ? "slate" : "green";
+    return '<button type="button" class="info-card tone-' + tone + '" data-vendor="' + v.id + '">' +
       "<h3>" + esc(v.name) + "</h3>" +
       '<div class="sub">' + esc(v.service || VENDOR_STATUS_LABEL[v.status] || "") + "</div>" +
       lines.join("") +
@@ -425,7 +434,7 @@
       if (a.account_number) lines.push('<div class="contact-line"><span class="lbl">Account number:</span> ' + esc(a.account_number) + "</div>");
       if (a.username) lines.push('<div class="contact-line"><span class="lbl">Username:</span> ' + esc(a.username) + "</div>");
       if (a.portal_url) lines.push('<div class="contact-line"><span class="lbl">Portal:</span> <a href="' + esc(safeUrl(a.portal_url)) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open site</a></div>');
-      return '<button type="button" class="info-card" data-account="' + a.id + '">' +
+      return '<button type="button" class="info-card tone-' + toneFor(ACCOUNT_TONE, a.category) + '" data-account="' + a.id + '">' +
         "<h3>" + esc(a.name) + "</h3>" +
         '<div class="sub">' + esc(a.category || "Account") + "</div>" +
         lines.join("") +
@@ -441,7 +450,7 @@
     $("role-grid").innerHTML = sortedRoles().map((r) => {
       const m = memberById(r.member_id);
       const count = S.tasks.filter((t) => t.role_id === r.id && t.status !== "done").length;
-      return '<button type="button" class="info-card" data-role="' + r.id + '">' +
+      return '<button type="button" class="info-card tone-purple" data-role="' + r.id + '">' +
         "<h3>" + esc(r.name) + "</h3>" +
         '<div class="sub">' + esc(m ? m.name : "Vacant") + "</div>" +
         '<div class="contact-line"><span class="lbl">Open items:</span> ' + count + "</div></button>";
@@ -452,7 +461,7 @@
       const sub = [rolesOf(m.id).map((r) => r.name).join(", ") || "No role"];
       if (m.apartment) sub.push("Apartment " + m.apartment);
       const on = boardMemberId === m.id;
-      return '<div class="info-card info-card-static">' +
+      return '<div class="info-card info-card-static tone-blue">' +
         "<h3>" + esc(m.name) + "</h3>" +
         '<div class="sub">' + esc(sub.join(", ")) + "</div>" +
         (m.email ? '<div class="contact-line"><span class="lbl">Email:</span> <a href="mailto:' + esc(m.email) + '">' + esc(m.email) + "</a></div>" : "") +
@@ -1004,8 +1013,8 @@
       else groups.push({ cat: cat, items: [f] });
     }
     $("fixture-list").innerHTML = groups.map((g) =>
-      '<h2 class="group-heading">' + esc(g.cat) + "</h2>" +
-      '<div class="card-grid">' + g.items.map(fixtureCard).join("") + "</div>").join("");
+      '<h2 class="group-heading tone-' + toneFor(FIXTURE_TONE, g.cat) + '">' + esc(g.cat) + "</h2>" +
+      '<div class="card-grid tone-' + toneFor(FIXTURE_TONE, g.cat) + '">' + g.items.map(fixtureCard).join("") + "</div>").join("");
     $("fixture-empty").hidden = S.fixtures.length > 0;
   }
 
@@ -1131,7 +1140,7 @@
           "<td>" + esc(s.label) + (on ? ' <span class="badge badge-open">This month</span>' : "") + "</td>" +
           "<td>" + esc(s.responsible || "Not set") + "</td></tr>";
       }).join("");
-      return '<article class="schedule-card">' +
+      return '<article class="schedule-card tone-green">' +
         '<div class="schedule-head">' +
           "<div><h3>" + esc(sc.name) + "</h3>" +
           (sc.description ? '<p class="sub">' + esc(sc.description) + "</p>" : "") + "</div>" +

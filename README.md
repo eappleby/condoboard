@@ -62,7 +62,8 @@ sample data and nothing is saved.
   Give a row its months and the site marks whose turn it is right now.
 * **Settings.** Monthly or Never, the day it goes out, and a preview.
 * **Monthly summary email.** Off until you switch it on. It opens with the
-  logo and three counters, then a table of everything overdue, due in the
+  logo and three counters, then who is up for each schedule such as the
+  apartment on trash, then a table of everything overdue, due in the
   month ahead and due in the month after. Below that, overdue items and the
   month ahead appear in full with who is responsible, vendor contacts,
   documents and costs.
@@ -78,7 +79,9 @@ The interface is built to be easy to read and easy to hit:
 * Every text and background pairing meets WCAG AA contrast, including the
   colored status labels.
 * Buttons, inputs and links are at least 44px tall.
-* Status is always written in words, never signalled by color alone.
+* Status is always written in words, never signalled by color alone. The
+  section colors on each tab are decoration on top of labels that already
+  say the same thing.
 * There is a skip link, visible focus rings, labels on every field, and
   Escape closes any dialog.
 * The layout honors the operating system settings for increased contrast
