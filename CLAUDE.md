@@ -69,7 +69,8 @@ read or write them. `rolesOf()` and `tasksOfMember()` resolve a person to
 their responsibilities, and the email function joins
 `role:board_roles(name,member:board_members(name,email))`.
 
-A vendor's people live in `vendor_contacts`: name, email, optional phone,
+A vendor's people live in `vendor_contacts`: name, an optional label such
+as Billing, email, optional phone,
 `is_primary` and `position`. `vendors.contact_name`, `vendors.email` and
 `vendors.phone` are dead columns kept for compatibility. `contactEditor`
 in the vendor modal keeps exactly one primary while any contact exists,

@@ -86,7 +86,7 @@
     ];
     const contacts = [
       { id: uid(), vendor_id: vendors[0].id, name: "Sample Manager", email: "office@example.com", phone: "(555) 010-4411", is_primary: true, position: 0 },
-      { id: uid(), vendor_id: vendors[0].id, name: "Sample Billing", email: "billing@example.com", phone: null, is_primary: false, position: 1 },
+      { id: uid(), vendor_id: vendors[0].id, name: "Sample Billing", label: "Billing", email: "billing@example.com", phone: null, is_primary: false, position: 1 },
       { id: uid(), vendor_id: vendors[1].id, name: "Sample Electrician", email: "info@example.com", phone: null, is_primary: true, position: 0 },
     ];
     return { members, roles, vendors, contacts, tasks, links, accounts, settings, schedules, scheduleSlots, fixtures };
@@ -504,6 +504,7 @@
     const lines = [];
     const people = contactsFor(v.id).map((c) =>
       '<div class="contact-person"><span class="lbl">' + esc(c.name) + "</span>" +
+      (c.label ? "<span>" + esc(c.label) + "</span>" : "") +
       (c.is_primary ? ' <span class="badge badge-open">Primary</span>' : "") +
       (c.email ? '<a href="mailto:' + esc(c.email) + '" onclick="event.stopPropagation()">' + esc(c.email) + "</a>" : "") +
       (c.phone ? '<a href="tel:' + esc(c.phone) + '" onclick="event.stopPropagation()">' + esc(c.phone) + "</a>" : "") +
@@ -899,6 +900,8 @@
           '<div class="doc-fields contact-fields">' +
             '<label class="field"><span class="visually-hidden">Name</span>' +
               '<input class="input" data-f="name" data-i="' + i + '" placeholder="Name" value="' + esc(c.name || "") + '"></label>' +
+            '<label class="field"><span class="visually-hidden">Label, optional</span>' +
+              '<input class="input" data-f="label" data-i="' + i + '" placeholder="Label (optional)" value="' + esc(c.label || "") + '"></label>' +
             '<label class="field"><span class="visually-hidden">Email</span>' +
               '<input class="input" type="email" data-f="email" data-i="' + i + '" placeholder="Email" value="' + esc(c.email || "") + '"></label>' +
             '<label class="field"><span class="visually-hidden">Phone, optional</span>' +
@@ -927,7 +930,7 @@
         }));
     }
     $("vf-contact-add").addEventListener("click", () => {
-      draft.push({ name: "", email: "", phone: "", is_primary: false });
+      draft.push({ name: "", label: "", email: "", phone: "", is_primary: false });
       fixPrimary();
       render();
       const inputs = $("vf-contacts").querySelectorAll('input[data-f="name"]');
@@ -935,7 +938,7 @@
     });
     return {
       reset(existing) {
-        draft = existing.map((c) => ({ id: c.id, name: c.name, email: c.email, phone: c.phone, is_primary: !!c.is_primary }));
+        draft = existing.map((c) => ({ id: c.id, name: c.name, label: c.label, email: c.email, phone: c.phone, is_primary: !!c.is_primary }));
         removed = [];
         fixPrimary();
         render();
@@ -959,7 +962,8 @@
     for (let i = 0; i < rows.length; i++) {
       const c = rows[i];
       const patch = {
-        name: c.name.trim(), email: (c.email || "").trim() || null,
+        name: c.name.trim(), label: (c.label || "").trim() || null,
+        email: (c.email || "").trim() || null,
         phone: (c.phone || "").trim() || null, is_primary: !!c.is_primary, position: i,
       };
       if (c.id) {

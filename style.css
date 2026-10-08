@@ -470,7 +470,7 @@ textarea.input { min-height: 80px; }
 .doc-grip:active { cursor: grabbing; }
 .doc-fields { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; flex: 1; min-width: 0; }
 .slot-fields { grid-template-columns: 1.2fr 1fr .9fr .9fr; }
-.contact-fields { grid-template-columns: 1fr 1.2fr 1fr; }
+.contact-fields { grid-template-columns: 1fr 1fr; }
 .contact-row { flex-wrap: wrap; }
 .contact-row .doc-fields { flex: 1 1 100%; }
 .contact-row .doc-buttons { align-items: center; justify-content: space-between; width: 100%; }
