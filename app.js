@@ -1702,7 +1702,9 @@
     }));
 
   // ---------------- mobile sidebar ----------------
+  let sidebarTimer = null;
   function openSidebar() {
+    clearTimeout(sidebarTimer);   // a close still animating must not hide it again
     $("sidebar-backdrop").hidden = false;
     $("sidebar").hidden = false;
     // Let the element render before animating it in.
@@ -1718,8 +1720,16 @@
     $("sidebar-backdrop").hidden = true;
     const finish = () => { sb.hidden = true; };
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) finish();
-    else setTimeout(finish, 220);
+    else sidebarTimer = setTimeout(finish, 220);
   }
+  // The logo and name go back to the dashboard, from the top bar or the menu.
+  document.querySelectorAll(".brand-home").forEach((a) =>
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      showView("dashboard");
+      closeSidebar();
+      window.scrollTo(0, 0);
+    }));
   $("menu-open").addEventListener("click", openSidebar);
   $("menu-close").addEventListener("click", () => { closeSidebar(); $("menu-open").focus(); });
   $("sidebar-backdrop").addEventListener("click", () => { closeSidebar(); $("menu-open").focus(); });

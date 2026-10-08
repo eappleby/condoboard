@@ -212,7 +212,8 @@ tab means testing widths again and probably raising it. `.tabs` is
 `nowrap` so a too-small breakpoint shows as horizontal overflow rather than a
 second row. The tabs exist twice in the markup, once in the top bar
 and once in the sidebar, and `showView()` keeps both copies in sync by
-`data-tab`. Escape closes a dialog first and only falls through to the
+`data-tab`. The logo and name in both places are a `.brand-home` link back to
+the dashboard. Escape closes a dialog first and only falls through to the
 sidebar when no dialog is open. The sidebar is unhidden before the `open`
 class is added on the next frame, otherwise the slide in animation does not
 run.
