@@ -40,7 +40,7 @@ replies in chat:
   the device instead.
 * `app.js` uses a `store` abstraction with two implementations,
   `makeDemoStore` and `makeSupabaseStore`, sharing
-  `load / insert / update / remove(kind, ...)` where kind is a key of `TABLE`,
+  `load / insert / update / remove(kind, ...)` and `upload(bucket, file)` where kind is a key of `TABLE`,
   such as members, roles, vendors, tasks, links, accounts. The UI holds all state in `S` and patches
   it after each successful store call. **Stores must not mutate `S`.** A demo
   store that also pushed rows caused double inserts once.
@@ -307,6 +307,15 @@ the SVGs change.
 
 The building's specification: paint colours, fittings, hardware, appliances.
 Cards are grouped by category, and `color_hex` draws a swatch when present.
+
+A fixture can carry one picture, shown on its card. It is either uploaded or
+linked, and both end up as an address in `fixtures.image_url`. An upload is
+shrunk in the browser to 1200px by `shrinkImage()` and put in the public
+Storage bucket `fixture-images` through `store.upload()`, which the demo
+store answers with a page-only blob address. The bucket and its policies
+come from a migration: open to `anon` like everything else, images only,
+5 MB a file. Replacing or removing a picture leaves the old file in the
+bucket. Nothing deletes it, which is fine at this size.
 
 Paint swatches were read from Benjamin Moore's own colour pages, from the
 `meta-bmc_color_hex` value, not guessed. Where the page did not confirm the

@@ -507,6 +507,21 @@
           <span>Link</span>
           <input class="input" id="xf-url" placeholder="https://">
         </label>
+        <fieldset class="links-fieldset">
+          <legend>Picture</legend>
+          <img id="xf-image-preview" class="fixture-preview" alt="Picture of this fixture" hidden>
+          <div class="field-row">
+            <label class="field">
+              <span>Upload a picture</span>
+              <input class="input" type="file" id="xf-image-file" accept="image/*">
+            </label>
+            <label class="field">
+              <span>Or link to one</span>
+              <input class="input" id="xf-image" placeholder="https://">
+            </label>
+          </div>
+          <button type="button" class="btn" id="xf-image-remove" hidden>Remove picture</button>
+        </fieldset>
         <label class="field">
           <span>Notes</span>
           <textarea class="input" id="xf-notes" rows="2"></textarea>

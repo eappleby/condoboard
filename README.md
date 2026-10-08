@@ -61,7 +61,8 @@ sample data and nothing is saved.
   to them.
 * **Fixtures.** What the building uses and what to buy when something is
   replaced: paint colours with swatches, light fittings, hardware, the
-  intercom, appliances. Each one can carry documents.
+  intercom, appliances. Each one can carry a picture, uploaded or linked,
+  and documents.
 * **Schedules.** Rotating duties such as the trash and recycling roster.
   Give a row its months and the site marks whose turn it is right now.
 * **Settings.** Monthly or Never, the day it goes out, and a preview.
@@ -277,7 +278,7 @@ migration from `anon, authenticated` to `authenticated`.
 ## Costs and limits
 
 Cloudflare Pages allows 500 builds a month with unlimited requests. Supabase
-gives 500 MB of database and 500,000 Edge Function calls a month. Resend
+gives 500 MB of database, 1 GB of file storage for fixture pictures, and 500,000 Edge Function calls a month. Resend
 allows 100 emails a day on one domain. All are far beyond what this building
 needs. The one thing to know is that Supabase pauses free projects after
 about a week with no activity, and the daily reminder cron is enough to keep

@@ -576,6 +576,19 @@ textarea.input { min-height: 80px; }
 }
 
 .fixture-title { display: flex; align-items: center; gap: 10px; }
+.fixture-card { display: flex; align-items: center; gap: 14px; }
+.fixture-card .sub { margin-bottom: 0; }
+.fixture-text { display: block; min-width: 0; }
+.fixture-pic {
+  width: 72px; height: 72px; flex: 0 0 auto; object-fit: cover;
+  border-radius: 8px; border: 1px solid var(--border); background: var(--surface-alt);
+}
+.fixture-preview {
+  display: block; max-width: 100%; max-height: 220px; margin: 0 0 14px;
+  border-radius: 8px; border: 1px solid var(--border);
+}
+#xf-image-remove { margin-top: 14px; }
+input[type="file"].input { padding: 7px 8px; }
 .swatch {
   width: 26px; height: 26px; border-radius: 6px; flex: 0 0 auto;
   border: 1px solid var(--border-strong);

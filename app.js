@@ -80,7 +80,7 @@
     }));
     const fixtures = [
       { id: uid(), name: "Sample Paint", category: "Paint", brand: "Sample Brand", code: "123",
-        location: "Walls", url: "https://example.com", color_hex: "#E0DFD7", notes: "", position: 0 },
+        location: "Walls", url: "https://example.com", image_url: null, color_hex: "#E0DFD7", notes: "", position: 0 },
       { id: uid(), name: "Sample Light", category: "Lighting", brand: "Sample Brand", code: null,
         location: "Hallway", url: "https://example.com", color_hex: null, notes: "", position: 1 },
     ];
@@ -108,6 +108,8 @@
       async insert(_kind, row) { return Object.assign({ id: crypto.randomUUID() }, row); },
       async update(_kind, _id, patch) { return patch; },
       async remove(_kind, _id) {},
+      // Nothing is stored in demo mode, so the picture lives for this page only.
+      async upload(_bucket, file) { return URL.createObjectURL(file); },
     };
   }
 
@@ -152,6 +154,14 @@
       },
       async remove(kind, id) {
         await q(client.from(TABLE[kind]).delete().eq("id", id));
+      },
+      // Puts a file in a public Storage bucket and returns its address.
+      async upload(bucket, file) {
+        const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+        const path = crypto.randomUUID() + "." + ext;
+        const { error } = await client.storage.from(bucket).upload(path, file, { contentType: file.type });
+        if (error) throw new Error(error.message);
+        return client.storage.from(bucket).getPublicUrl(path).data.publicUrl;
       },
     };
   }
@@ -1203,9 +1213,12 @@
     const swatch = f.color_hex
       ? '<span class="swatch" style="background:' + esc(f.color_hex) + '" aria-hidden="true"></span>'
       : "";
-    return '<button type="button" class="info-card" data-fixture="' + f.id + '">' +
-      '<h3 class="fixture-title">' + swatch + esc(f.name) + "</h3>" +
-      '<div class="sub">' + esc([f.brand, f.code].filter(Boolean).join(", ") || f.category || "") + "</div></button>";
+    const pic = f.image_url
+      ? '<img class="fixture-pic" src="' + esc(picUrl(f.image_url)) + '" alt="" loading="lazy">'
+      : "";
+    return '<button type="button" class="info-card fixture-card" data-fixture="' + f.id + '">' + pic +
+      '<span class="fixture-text"><h3 class="fixture-title">' + swatch + esc(f.name) + "</h3>" +
+      '<div class="sub">' + esc([f.brand, f.code].filter(Boolean).join(", ") || f.category || "") + "</div></span></button>";
   }
 
   function openFixtureModal(f) {
@@ -1222,11 +1235,55 @@
     $("xf-has-color").checked = !!hex;
     $("xf-color").value = hex || "#cccccc";
     $("xf-color").disabled = !hex;
+    $("xf-image").value = f ? (f.image_url || "") : "";
+    $("xf-image-file").value = "";
+    showFixturePreview();
     $("xf-delete").hidden = !f;
     fixtureLinkEditor.reset(f ? linksFor("fixture", f.id) : []);
     openModal("fixture-modal");
     $("xf-name").focus();
   }
+
+  // A picture is either uploaded or linked. Both end up as an address in
+  // image_url. An upload is shrunk first, since a phone photo is far larger
+  // than a card needs.
+  const FIXTURE_BUCKET = "fixture-images";
+  // Demo mode hands back a blob address, which must not gain an https prefix.
+  function picUrl(u) { return /^blob:/.test(u) ? u : safeUrl(u); }
+  function showFixturePreview() {
+    const url = $("xf-image").value.trim();
+    const file = $("xf-image-file").files[0];
+    const img = $("xf-image-preview");
+    img.hidden = !(url || file);
+    if (file) img.src = URL.createObjectURL(file);
+    else if (url) img.src = picUrl(url);
+    $("xf-image-remove").hidden = img.hidden;
+  }
+  function shrinkImage(file, max) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width * scale);
+        c.height = Math.round(img.height * scale);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        c.toBlob((blob) => resolve(blob
+          ? new File([blob], file.name.replace(/\.[^.]*$/, "") + ".jpg", { type: "image/jpeg" })
+          : file), "image/jpeg", 0.85);
+      };
+      img.onerror = () => resolve(file);
+      img.src = URL.createObjectURL(file);
+    });
+  }
+  $("xf-image").addEventListener("input", () => { $("xf-image-file").value = ""; showFixturePreview(); });
+  $("xf-image-file").addEventListener("change", () => { $("xf-image").value = ""; showFixturePreview(); });
+  $("xf-image-remove").addEventListener("click", () => {
+    $("xf-image").value = "";
+    $("xf-image-file").value = "";
+    showFixturePreview();
+  });
+  $("xf-image-preview").addEventListener("error", () => { $("xf-image-preview").hidden = true; });
 
   $("xf-has-color").addEventListener("change", () => {
     $("xf-color").disabled = !$("xf-has-color").checked;
@@ -1245,7 +1302,11 @@
       color_hex: $("xf-has-color").checked ? $("xf-color").value : null,
       notes: $("xf-notes").value.trim() || null,
     };
+    const typed = $("xf-image").value.trim();
+    row.image_url = typed ? picUrl(typed) : null;
     try {
+      const file = $("xf-image-file").files[0];
+      if (file) row.image_url = await getStore().upload(FIXTURE_BUCKET, await shrinkImage(file, 1200));
       let saved;
       if (id) {
         const existing = S.fixtures.find((x) => x.id === id);
