@@ -212,6 +212,23 @@ to the right. The three filter selects sit in `#filter-panel`, hidden until
 Filter is pressed. Hiding the panel does not clear the filters, so the
 button reads "Filter (2)" while any are set.
 
+The table is kept sparse on purpose. Columns are responsibility, assigned
+to, due, last done, cost and status. There is no category column, though
+the category filter remains. Assigned to is the holder's first name only,
+with no role, surname or picture. Dates go through `shortDate()`: the day in
+the current year, otherwise just the year. An overdue date is red and bold,
+with a visually hidden "Overdue" in front and the full wording in `title`.
+The done button sits under the status badge, a green outlined check with
+the word Done and the accessible name "Mark done". Evan asked for a check
+mark there. It is an inline SVG, in keeping with the no emoji rule. Evan
+also asked for it to be small, so at 30px tall it is the one control below
+the 44px target. Do not grow it back.
+
+Headings sort the table. `taskSort` holds the key and direction, `SORT_VALUE`
+maps a key to a row value, empty values always sort last, and `aria-sort` on
+the `th` drives the arrow. With no key the default order applies: open items
+by due date, then done ones.
+
 The Board tab has a Roles grid and a Members grid. Role cards open the role
 modal. Member cards are not buttons, because they hold two buttons of their
 own: Responsibilities, which lists that person's open items under the grid
@@ -310,7 +327,7 @@ Worth repeating after changes: the gate, add, edit and delete for every
 record type including roles, Mark done on a recurring item (row count
 unchanged, status still open, and the next date is right), reassigning a
 role and checking the member's list follows, links add and remove, the
-Filter button and its filters, Escape closing a
+Filter button and its filters, sorting by each heading in both directions, Escape closing a
 dialog, the settings form including the live summary and the guard on an empty
 digest address, document reorder and rename round trips, schedule editing,
 and the mobile viewport.

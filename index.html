@@ -145,14 +145,12 @@
         <table class="table" id="task-table">
           <thead>
             <tr>
-              <th scope="col" class="col-title">Responsibility</th>
-              <th scope="col">Category</th>
-              <th scope="col">Assigned to</th>
-              <th scope="col">Due</th>
-              <th scope="col">Last done</th>
-              <th scope="col">Cost</th>
-              <th scope="col">Status</th>
-              <th scope="col"><span class="visually-hidden">Actions</span></th>
+              <th scope="col" class="col-title" data-sort="title" aria-sort="none"><button type="button">Responsibility</button></th>
+              <th scope="col" data-sort="assignee" aria-sort="none"><button type="button">Assigned to</button></th>
+              <th scope="col" data-sort="due" aria-sort="none"><button type="button">Due</button></th>
+              <th scope="col" data-sort="last" aria-sort="none"><button type="button">Last done</button></th>
+              <th scope="col" data-sort="cost" aria-sort="none"><button type="button">Cost</button></th>
+              <th scope="col" data-sort="status" aria-sort="none"><button type="button">Status</button></th>
             </tr>
           </thead>
           <tbody id="task-tbody"></tbody>

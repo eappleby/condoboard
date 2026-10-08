@@ -380,6 +380,31 @@
       'onclick="event.stopPropagation()">' + esc(l.title || l.kind) + "</a>").join("") + "</span>";
   }
 
+  // Table dates stay short: the day in the current year, otherwise the year.
+  function shortDate(dateStr) {
+    if (!dateStr) return "";
+    const d = new Date(dateStr + "T00:00:00");
+    return d.getFullYear() === new Date().getFullYear()
+      ? d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+      : String(d.getFullYear());
+  }
+  function firstName(t) {
+    const r = roleById(t.role_id);
+    const m = r && memberById(r.member_id);
+    return m ? m.name.trim().split(/\s+/)[0] : "";
+  }
+  // Clicking a column heading sorts by it, then reverses. With no key the
+  // table keeps its usual order: open items by due date, then done ones.
+  const taskSort = { key: null, dir: 1 };
+  const SORT_VALUE = {
+    title: (t) => t.title.toLowerCase(),
+    assignee: (t) => firstName(t).toLowerCase() || null,
+    due: (t) => t.due_date || null,
+    last: (t) => t.last_completed_on || null,
+    cost: (t) => (t.estimated_cost == null ? null : Number(t.estimated_cost)),
+    status: (t) => ({ open: 0, in_progress: 1, done: 2 })[t.status],
+  };
+
   function renderTaskTable() {
     const search = $("task-search").value.trim().toLowerCase();
     const fStatus = $("filter-status").value;
@@ -395,24 +420,43 @@
     $("filter-toggle").textContent = active ? "Filter (" + active + ")" : "Filter";
 
     const rank = { open: 0, in_progress: 0, done: 1 };
-    rows.sort((a, b) => (rank[a.status] - rank[b.status]) ||
-      ((a.due_date || "9999").localeCompare(b.due_date || "9999")));
+    if (taskSort.key) {
+      // Empty values go last whichever way the column is sorted.
+      const val = SORT_VALUE[taskSort.key];
+      rows.sort((a, b) => {
+        const x = val(a), y = val(b);
+        if (x == null || y == null) return (x == null) - (y == null);
+        return (typeof x === "number" ? x - y : String(x).localeCompare(String(y))) * taskSort.dir;
+      });
+    } else {
+      rows.sort((a, b) => (rank[a.status] - rank[b.status]) ||
+        ((a.due_date || "9999").localeCompare(b.due_date || "9999")));
+    }
+    document.querySelectorAll("#task-table th[data-sort]").forEach((th) => {
+      const on = th.dataset.sort === taskSort.key;
+      th.setAttribute("aria-sort", on ? (taskSort.dir > 0 ? "ascending" : "descending") : "none");
+    });
 
     $("task-tbody").innerHTML = rows.map((t) => {
       const due = dueText(t);
-      const rowCls = t.status === "done" ? "row-plain" : due.cls ? "row-" + due.cls : "row-plain";
+      const done = t.status === "done";
+      const rowCls = done ? "row-plain" : due.cls ? "row-" + due.cls : "row-plain";
+      const when = done ? (t.completed_at ? ymd(new Date(t.completed_at)) : t.due_date) : t.due_date;
+      const flag = !done && due.cls === "overdue" ? '<span class="visually-hidden">Overdue </span>' : "";
       return '<tr class="' + rowCls + '" data-task="' + t.id + '">' +
         '<td><div class="t-title">' + esc(t.title) + "</div>" +
           (t.description ? '<div class="t-desc">' + esc(t.description) + "</div>" : "") +
           linkChips(linksFor("task", t.id)) + "</td>" +
-        '<td><span class="badge badge-cat">' + esc(t.category || "Other") + "</span></td>" +
-        "<td>" + assigneeChip(t) + "</td>" +
-        '<td class="' + (due.cls ? "due-" + due.cls : "") + '">' + esc(due.text) + "</td>" +
-        "<td>" + (t.last_completed_on ? esc(fmtDate(t.last_completed_on)) : "Not recorded") + "</td>" +
+        "<td>" + esc(firstName(t)) + "</td>" +
+        '<td class="t-date ' + (!done && due.cls ? "due-" + due.cls : "") + '" title="' + esc(due.text) + '">' +
+          flag + esc(shortDate(when)) + "</td>" +
+        '<td class="t-date">' + esc(shortDate(t.last_completed_on)) + "</td>" +
         "<td>" + (t.estimated_cost != null ? esc(fmtMoney(t.estimated_cost)) : "") + "</td>" +
-        '<td><span class="badge badge-' + t.status + '">' + STATUS_LABEL[t.status] + "</span></td>" +
-        '<td class="t-actions">' + (t.status !== "done"
-          ? '<button type="button" class="btn-done" data-done="' + t.id + '">Mark done</button>' : "") +
+        '<td class="t-status"><span class="badge badge-' + t.status + '">' + STATUS_LABEL[t.status] + "</span>" +
+          (!done ? '<button type="button" class="btn-done" data-done="' + t.id + '" aria-label="Mark done">' +
+            '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">' +
+            '<path d="M2.5 8.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+            'stroke-linecap="round" stroke-linejoin="round"/></svg>Done</button>' : "") +
         "</td></tr>";
     }).join("");
     $("task-empty").hidden = rows.length > 0;
@@ -1571,6 +1615,14 @@
     $("filter-toggle").setAttribute("aria-expanded", String(open));
     if (open) $("filter-status").focus();
   });
+
+  document.querySelectorAll("#task-table th[data-sort] button").forEach((b) =>
+    b.addEventListener("click", () => {
+      const key = b.parentElement.dataset.sort;
+      if (taskSort.key === key) taskSort.dir = -taskSort.dir;
+      else { taskSort.key = key; taskSort.dir = 1; }
+      renderTaskTable();
+    }));
 
   ["task-search", "filter-status", "filter-category", "filter-assignee"].forEach((id) =>
     $(id).addEventListener("input", renderTaskTable));

@@ -40,7 +40,7 @@ sample data and nothing is saved.
   progress, recently completed, and anything with no date set. Five counters
   across the top, including the estimated cost of all open work.
 * **Responsibilities.** A searchable list, with status, category and role
-  filters behind the Filter button. Each item carries a category, priority,
+  filters behind the Filter button, sortable by any column heading. Each item carries a category, priority,
   due date, the date it was last done, an estimated cost, a board role, an
   optional vendor, a repeat interval, and attached links.
 * **Recurring duties.** Mark a repeating item done and it stays open. Today
@@ -79,7 +79,8 @@ The interface is built to be easy to read and easy to hit:
 * Base text is 16px and no interface text falls below 14px.
 * Every text and background pairing meets WCAG AA contrast, including the
   colored status labels.
-* Buttons, inputs and links are at least 44px tall.
+* Buttons, inputs and links are at least 44px tall, apart from the small
+  Done button in the responsibilities table.
 * Status is always written in words, never signalled by color alone. The
   section colors on each tab are decoration on top of labels that already
   say the same thing.
