@@ -36,14 +36,16 @@ sample data and nothing is saved.
 
 ## What it does
 
-* **Dashboard.** Overdue, due in the next 30 days, coming up later, in
-  progress, recently completed, and anything with no date set. Five counters
-  across the top, including the estimated cost of all open work.
+* **Dashboard.** Overdue, due in the next 30 days, coming up later,
+  recently completed, and anything with no date set. Five counters
+  across the top, including the estimated cost of all active work.
 * **Responsibilities.** A searchable list, with status, category and role
   filters behind the Filter button, sortable by any column heading. Each item carries a category, priority,
   due date, the date it was last done, an estimated cost, a board role, an
   optional vendor, a repeat interval, and attached links.
-* **Recurring duties.** Mark a repeating item done and it stays open. Today
+* **Statuses.** Active, Complete or Canceled. The list shows active items
+  until the filter says otherwise, and overdue is shown by a red due date.
+* **Recurring duties.** Mark a repeating item done and it stays active. Today
   is recorded as the last time it was done and the due date moves to the
   next cycle. Intervals run from monthly through every five years.
 * **Vendors.** Contact details, contract cost and period, notes, and attached

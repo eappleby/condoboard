@@ -212,6 +212,22 @@ to the right. The three filter selects sit in `#filter-panel`, hidden until
 Filter is pressed. Hiding the panel does not clear the filters, so the
 button reads "Filter (2)" while any are set.
 
+Statuses are Active, Complete and Canceled. They are stored as `open`,
+`done` and `canceled`, with the old words kept in the database so a site or
+function from before the change still reads them correctly. Use
+`isActive()` and `STATUS_LABEL`, and never show the stored word. There is no
+in progress status and no overdue status. Overdue is only ever the red due
+date. A repeating item is always active, since completing it rolls it
+forward, though it can be canceled.
+
+The status filter defaults to Active, so the table opens on active items
+only, and only another choice counts toward "Filter (2)". The status badge
+shows only under All statuses. In the Active view the last column holds just
+the done button under a visually hidden heading, and in the Complete and
+Canceled views that column is hidden through `data-view` on the table. The
+dashboard, the role and member counts and the email all count active items
+only.
+
 The table is kept sparse on purpose. Columns are responsibility, assigned
 to, due, last done, cost and status. There is no category column, though
 the category filter remains. Assigned to is the holder's first name only,
@@ -295,7 +311,7 @@ marks whoever is up this month. It handles ranges that wrap past December.
 
 * Recurrence roll forward is client side and in place. Completing a
   repeating task, by the Mark done button or through the modal, never leaves
-  it done and never inserts a row. `rollForward()` sets it back to open,
+  it done and never inserts a row. `rollForward()` keeps it active,
   records today in `last_completed_on`, and moves `due_date` with
   `nextDue()`, which steps from the old due date past any missed cycles, or
   from today when there was no date. Both paths call `rollForward()`. Rows
@@ -325,7 +341,8 @@ Playwright. Automated tests must pass the gate first.
 
 Worth repeating after changes: the gate, add, edit and delete for every
 record type including roles, Mark done on a recurring item (row count
-unchanged, status still open, and the next date is right), reassigning a
+unchanged, still active, and the next date is right), each status filter
+view including which of the badge and done button show, reassigning a
 role and checking the member's list follows, links add and remove, the
 Filter button and its filters, sorting by each heading in both directions, Escape closing a
 dialog, the settings form including the live summary and the guard on an empty

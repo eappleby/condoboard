@@ -20,7 +20,11 @@
     monthly: 1, quarterly: 3, semiannual: 6, annual: 12,
     biennial: 24, three_year: 36, four_year: 48, five_year: 60,
   };
-  const STATUS_LABEL = { open: "Open", in_progress: "In progress", done: "Done" };
+  // Stored values are open, done and canceled. The board sees them as
+  // Active, Complete and Canceled. in_progress is a retired value that a
+  // migration folds into open, and it reads as Active until then.
+  const STATUS_LABEL = { open: "Active", in_progress: "Active", done: "Complete", canceled: "Canceled" };
+  function isActive(t) { return t.status === "open" || t.status === "in_progress"; }
   const VENDOR_STATUS_LABEL = { contracted: "Under contract", recommended: "Recommended", past: "No longer used" };
 
   // ------------------------------------------------------------------
@@ -58,8 +62,9 @@
     const tasks = [
       { id: uid(), title: "Sample overdue project", description: "This is demo data.", category: "Maintenance", status: "open", priority: "high", due_date: d(-40), last_completed_on: "2019-01-01", recurrence: "none", estimated_cost: 4000, role_id: m(0), vendor_id: null, completed_at: null },
       { id: uid(), title: "Sample inspection", description: "", category: "Inspections", status: "open", priority: "normal", due_date: d(12), last_completed_on: null, recurrence: "annual", estimated_cost: 1500, role_id: m(1), vendor_id: v(0), completed_at: null },
-      { id: uid(), title: "Sample filing", description: "", category: "Legal & Compliance", status: "in_progress", priority: "high", due_date: d(60), last_completed_on: null, recurrence: "annual", estimated_cost: null, role_id: m(0), vendor_id: null, completed_at: null },
+      { id: uid(), title: "Sample filing", description: "", category: "Legal & Compliance", status: "open", priority: "high", due_date: d(60), last_completed_on: null, recurrence: "annual", estimated_cost: null, role_id: m(0), vendor_id: null, completed_at: null },
       { id: uid(), title: "Sample completed item", description: "", category: "Financial", status: "done", priority: "normal", due_date: d(-90), last_completed_on: null, recurrence: "none", estimated_cost: null, role_id: m(1), vendor_id: null, completed_at: new Date(today.getTime() - 88 * 864e5).toISOString() },
+      { id: uid(), title: "Sample canceled item", description: "", category: "Maintenance", status: "canceled", priority: "normal", due_date: d(20), last_completed_on: null, recurrence: "none", estimated_cost: null, role_id: null, vendor_id: null, completed_at: null },
       { id: uid(), title: "Sample item with no date", description: "", category: "Financial", status: "open", priority: "normal", due_date: null, last_completed_on: null, recurrence: "annual", estimated_cost: 150, role_id: null, vendor_id: null, completed_at: null },
     ];
     const links = [
@@ -185,6 +190,7 @@
     return Number(n).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
   }
   function dueText(t) {
+    if (t.status === "canceled") return { text: "Canceled", cls: "" };
     if (t.status === "done") {
       const when = t.completed_at ? ymd(new Date(t.completed_at)) : t.due_date;
       return { text: when ? "Completed " + fmtDate(when) : "Completed", cls: "" };
@@ -215,7 +221,7 @@
   function rolesOf(memberId) { return sortedRoles().filter((r) => r.member_id === memberId); }
   function tasksOfMember(memberId) {
     const ids = rolesOf(memberId).map((r) => r.id);
-    return S.tasks.filter((t) => t.status !== "done" && ids.includes(t.role_id));
+    return S.tasks.filter((t) => isActive(t) && ids.includes(t.role_id));
   }
   function vendorById(id) { return S.vendors.find((v) => v.id === id); }
   function accountById(id) { return S.accounts.find((a) => a.id === id); }
@@ -311,11 +317,11 @@
     const due = doneOn ? { text: "Done " + fmtDate(doneOn), cls: "" } : dueText(t);
     const v = vendorById(t.vendor_id);
     const bits = ['<span class="badge badge-cat">' + esc(t.category || "Other") + "</span>"];
-    if (t.priority === "high" && t.status !== "done") bits.push('<span class="badge badge-high">High priority</span>');
+    if (t.priority === "high" && isActive(t)) bits.push('<span class="badge badge-high">High priority</span>');
     if (t.recurrence && t.recurrence !== "none") bits.push("<span>Repeats " + RECUR_LABEL[t.recurrence].toLowerCase() + "</span>");
     if (t.estimated_cost != null) bits.push('<span class="badge badge-cost">' + esc(fmtMoney(t.estimated_cost)) + "</span>");
     if (v) bits.push("<span>" + esc(v.name) + "</span>");
-    if (doneOn && t.status !== "done" && t.due_date) bits.push("<span>Next due " + esc(fmtDate(t.due_date)) + "</span>");
+    if (doneOn && isActive(t) && t.due_date) bits.push("<span>Next due " + esc(fmtDate(t.due_date)) + "</span>");
     const mod = (doneOn || t.status === "done") ? " is-done" : due.cls ? " is-" + due.cls : "";
     return '<button type="button" class="task-card' + mod + '" data-task="' + t.id + '">' +
       '<span class="row1"><span class="title">' + esc(t.title) + "</span>" +
@@ -330,7 +336,7 @@
   }
 
   function renderDashboard() {
-    const open = S.tasks.filter((t) => t.status !== "done");
+    const open = S.tasks.filter(isActive);
     const overdue = open.filter((t) => daysUntil(t.due_date) != null && daysUntil(t.due_date) < 0)
       .sort((a, b) => a.due_date.localeCompare(b.due_date));
     const soon = open.filter((t) => { const n = daysUntil(t.due_date); return n != null && n >= 0 && n <= 30; })
@@ -338,27 +344,25 @@
     const later = open.filter((t) => { const n = daysUntil(t.due_date); return n != null && n > 30; })
       .sort((a, b) => a.due_date.localeCompare(b.due_date));
     const nodate = open.filter((t) => !t.due_date);
-    const inprog = S.tasks.filter((t) => t.status === "in_progress");
     const done = S.tasks.map((t) => ({
       t: t,
       on: t.status === "done" ? (t.completed_at ? ymd(new Date(t.completed_at)) : t.due_date)
-        : isRecurring(t) ? t.last_completed_on : null,
+        : isActive(t) && isRecurring(t) ? t.last_completed_on : null,
     })).filter((x) => x.on).sort((a, b) => b.on.localeCompare(a.on)).slice(0, 6);
 
     const upcomingCost = open.reduce((sum, t) => sum + (Number(t.estimated_cost) || 0), 0);
     $("stats").innerHTML =
       '<div class="stat stat-red"><div class="num">' + overdue.length + '</div><div class="lbl">Overdue</div></div>' +
       '<div class="stat stat-amber"><div class="num">' + soon.length + '</div><div class="lbl">Due in 30 days</div></div>' +
-      '<div class="stat stat-blue"><div class="num">' + open.length + '</div><div class="lbl">Open responsibilities</div></div>' +
+      '<div class="stat stat-blue"><div class="num">' + open.length + '</div><div class="lbl">Active responsibilities</div></div>' +
       '<div class="stat stat-green"><div class="num">' + S.vendors.filter((v) => v.status !== "past").length +
         '</div><div class="lbl">Vendors on file</div></div>' +
       '<div class="stat stat-blue"><div class="num">' + esc(fmtMoney(upcomingCost) || "$0") +
-        '</div><div class="lbl">Estimated cost of open work</div></div>';
+        '</div><div class="lbl">Estimated cost of active work</div></div>';
 
     renderList("list-overdue", overdue, "Nothing is overdue.");
     renderList("list-soon", soon, "Nothing is due in the next 30 days.");
     renderList("list-later", later.slice(0, 8), "Nothing scheduled further out.");
-    renderList("list-inprogress", inprog, "Nothing is in progress.");
     $("list-done").innerHTML = done.length
       ? done.map((x) => taskCard(x.t, x.on)).join("")
       : '<p class="none">Nothing completed yet.</p>';
@@ -402,7 +406,7 @@
     due: (t) => t.due_date || null,
     last: (t) => t.last_completed_on || null,
     cost: (t) => (t.estimated_cost == null ? null : Number(t.estimated_cost)),
-    status: (t) => ({ open: 0, in_progress: 1, done: 2 })[t.status],
+    status: (t) => ({ open: 0, in_progress: 0, done: 1, canceled: 2 })[t.status],
   };
 
   function renderTaskTable() {
@@ -413,13 +417,25 @@
 
     let rows = S.tasks.slice();
     if (search) rows = rows.filter((t) => (t.title + " " + (t.description || "")).toLowerCase().includes(search));
-    if (fStatus) rows = rows.filter((t) => t.status === fStatus);
+    if (fStatus === "open") rows = rows.filter(isActive);
+    else if (fStatus !== "all") rows = rows.filter((t) => t.status === fStatus);
     if (fCat) rows = rows.filter((t) => (t.category || "Other") === fCat);
     if (fAss) rows = rows.filter((t) => fAss === "none" ? !roleById(t.role_id) : t.role_id === fAss);
-    const active = [fStatus, fCat, fAss].filter(Boolean).length;
+    // Active is the default, so only another status counts as a filter.
+    const active = [fStatus !== "open", fCat, fAss].filter(Boolean).length;
     $("filter-toggle").textContent = active ? "Filter (" + active + ")" : "Filter";
 
-    const rank = { open: 0, in_progress: 0, done: 1 };
+    // The status badge only appears when every status is listed, since
+    // otherwise each row has the status the filter names. The last column
+    // then holds just the done button, and goes away entirely for the
+    // complete and canceled lists.
+    const showStatus = fStatus === "all";
+    $("task-table").dataset.view = fStatus;
+    $("th-status-sort").hidden = !showStatus;
+    $("th-status-plain").hidden = showStatus;
+    if (!showStatus && taskSort.key === "status") taskSort.key = null;
+
+    const rank = { open: 0, in_progress: 0, done: 1, canceled: 2 };
     if (taskSort.key) {
       // Empty values go last whichever way the column is sorted.
       const val = SORT_VALUE[taskSort.key];
@@ -439,9 +455,9 @@
 
     $("task-tbody").innerHTML = rows.map((t) => {
       const due = dueText(t);
-      const done = t.status === "done";
+      const done = !isActive(t);
       const rowCls = done ? "row-plain" : due.cls ? "row-" + due.cls : "row-plain";
-      const when = done ? (t.completed_at ? ymd(new Date(t.completed_at)) : t.due_date) : t.due_date;
+      const when = t.status === "done" && t.completed_at ? ymd(new Date(t.completed_at)) : t.due_date;
       const flag = !done && due.cls === "overdue" ? '<span class="visually-hidden">Overdue </span>' : "";
       return '<tr class="' + rowCls + '" data-task="' + t.id + '">' +
         '<td><div class="t-title">' + esc(t.title) + "</div>" +
@@ -452,7 +468,8 @@
           flag + esc(shortDate(when)) + "</td>" +
         '<td class="t-date">' + esc(shortDate(t.last_completed_on)) + "</td>" +
         "<td>" + (t.estimated_cost != null ? esc(fmtMoney(t.estimated_cost)) : "") + "</td>" +
-        '<td class="t-status"><span class="badge badge-' + t.status + '">' + STATUS_LABEL[t.status] + "</span>" +
+        '<td class="t-status">' + (showStatus ? '<span class="badge badge-' + (isActive(t) ? "open" : t.status) + '">' +
+          STATUS_LABEL[t.status] + "</span>" : "") +
           (!done ? '<button type="button" class="btn-done" data-done="' + t.id + '" aria-label="Mark done">' +
             '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">' +
             '<path d="M2.5 8.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.2" ' +
@@ -522,7 +539,7 @@
   function renderMembers() {
     $("role-grid").innerHTML = sortedRoles().map((r) => {
       const m = memberById(r.member_id);
-      const count = S.tasks.filter((t) => t.role_id === r.id && t.status !== "done").length;
+      const count = S.tasks.filter((t) => t.role_id === r.id && isActive(t)).length;
       return '<button type="button" class="info-card tone-purple" data-role="' + r.id + '">' +
         "<h3>" + esc(r.name) + "</h3>" +
         '<div class="sub">' + esc(m ? m.name : "Vacant") + "</div>" +
@@ -787,7 +804,7 @@
     fillSelect($("tf-assignee"), sortedRoles().map((r) => ({ id: r.id, name: roleLabel(r) })),
       t ? t.role_id : "", "Unassigned");
     fillSelect($("tf-vendor"), S.vendors, t ? t.vendor_id : "", "None");
-    $("tf-status").value = t ? t.status : "open";
+    $("tf-status").value = t && !isActive(t) ? t.status : "open";
     $("tf-delete").hidden = !t;
     taskLinkEditor.reset(t ? linksFor("task", t.id) : []);
     openModal("task-modal");

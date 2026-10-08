@@ -97,10 +97,6 @@
         </div>
         <div class="dash-col">
           <section class="dash-section">
-            <h2><span class="status-key status-key-progress">In progress</span></h2>
-            <div class="card-list" id="list-inprogress"></div>
-          </section>
-          <section class="dash-section">
             <h2><span class="status-key status-key-done">Recently completed</span></h2>
             <div class="card-list" id="list-done"></div>
           </section>
@@ -126,10 +122,10 @@
         <label class="field">
           <span class="visually-hidden">Filter by status</span>
           <select id="filter-status" class="input">
-            <option value="">All statuses</option>
-            <option value="open">Open</option>
-            <option value="in_progress">In progress</option>
-            <option value="done">Done</option>
+            <option value="open" selected>Active</option>
+            <option value="done">Complete</option>
+            <option value="canceled">Canceled</option>
+            <option value="all">All statuses</option>
           </select>
         </label>
         <label class="field">
@@ -150,7 +146,7 @@
               <th scope="col" data-sort="due" aria-sort="none"><button type="button">Due</button></th>
               <th scope="col" data-sort="last" aria-sort="none"><button type="button">Last done</button></th>
               <th scope="col" data-sort="cost" aria-sort="none"><button type="button">Cost</button></th>
-              <th scope="col" data-sort="status" aria-sort="none"><button type="button">Status</button></th>
+              <th scope="col" class="t-status" data-sort="status" aria-sort="none"><button type="button" id="th-status-sort" hidden>Status</button><span class="visually-hidden" id="th-status-plain">Mark done</span></th>
             </tr>
           </thead>
           <tbody id="task-tbody"></tbody>
@@ -321,9 +317,9 @@
         <label class="field">
           <span>Status</span>
           <select class="input" id="tf-status">
-            <option value="open">Open</option>
-            <option value="in_progress">In progress</option>
-            <option value="done">Done</option>
+            <option value="open">Active</option>
+            <option value="done">Complete</option>
+            <option value="canceled">Canceled</option>
           </select>
         </label>
         <fieldset class="links-fieldset">

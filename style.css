@@ -262,7 +262,6 @@ textarea.input { min-height: 80px; }
 .status-key-overdue  { background: var(--red-soft);    color: var(--red);     border: 1px solid #e8b4b0; }
 .status-key-soon     { background: var(--amber-soft);  color: var(--amber);   border: 1px solid #e0bd8c; }
 .status-key-later    { background: var(--primary-soft);color: var(--primary-dark); border: 1px solid #b7c9f2; }
-.status-key-progress { background: var(--purple-soft); color: var(--purple);  border: 1px solid #cbb6f0; }
 .status-key-done     { background: var(--green-soft);  color: var(--green);   border: 1px solid #a9d5b7; }
 .status-key-nodate   { background: var(--slate-soft);  color: var(--slate);   border: 1px solid var(--border-strong); }
 
@@ -298,7 +297,7 @@ textarea.input { min-height: 80px; }
 }
 .badge-cat { background: var(--slate-soft); color: var(--slate); border-color: var(--border); }
 .badge-open { background: var(--primary-soft); color: var(--primary-dark); border-color: #b7c9f2; }
-.badge-in_progress { background: var(--purple-soft); color: var(--purple); border-color: #cbb6f0; }
+.badge-canceled { background: var(--slate-soft); color: var(--slate); border-color: var(--border-strong); }
 .badge-done { background: var(--green-soft); color: var(--green); border-color: #a9d5b7; }
 .badge-high { background: var(--red-soft); color: var(--red); border-color: #e8b4b0; }
 .badge-cost { background: var(--surface-alt); color: var(--text-soft); border-color: var(--border); }
@@ -351,7 +350,8 @@ textarea.input { min-height: 80px; }
 #task-table th[aria-sort="ascending"] button::after { border-bottom: 7px solid currentColor; }
 #task-table th[aria-sort="descending"] button::after { border-top: 7px solid currentColor; }
 .table .t-date { white-space: nowrap; }
-.table .t-status .badge { display: block; width: fit-content; }
+.table .t-status .badge { display: block; width: fit-content; margin-bottom: 8px; }
+#task-table[data-view="done"] .t-status, #task-table[data-view="canceled"] .t-status { display: none; }
 .table td { padding: 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
 .table tbody tr:last-child td { border-bottom: none; }
 .table tbody tr { cursor: pointer; }
@@ -373,7 +373,7 @@ textarea.input { min-height: 80px; }
 .link-chip:hover { background: #d9e4fa; }
 
 .btn-done {
-  display: inline-flex; align-items: center; gap: 5px; margin-top: 8px;
+  display: inline-flex; align-items: center; gap: 5px;
   border: 1.5px solid var(--green); background: var(--surface); color: var(--green);
   border-radius: 6px; font-size: 14px; font-weight: 600; padding: 3px 9px;
   min-height: 30px; cursor: pointer; font-family: inherit;

@@ -467,7 +467,9 @@ if (import.meta.main) {
                 "role:board_roles(name,member:board_members(name,email))," +
                 "vendor:vendors(name,contact_name,email,phone,website)," +
                 "links(title,url,sort_order)")
-        .neq("status", "done")
+        // Active only. in_progress is a retired value that still counts as
+        // active until the status migration has run.
+        .in("status", ["open", "in_progress"])
         .not("due_date", "is", null)
         .lte("due_date", iso(afterEnd))
         .order("due_date");
