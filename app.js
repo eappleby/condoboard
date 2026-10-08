@@ -13,11 +13,12 @@
   const RECUR_LABEL = {
     none: "", monthly: "Monthly", quarterly: "Quarterly",
     semiannual: "Every 6 months", annual: "Yearly",
-    biennial: "Every 2 years", three_year: "Every 3 years", five_year: "Every 5 years",
+    biennial: "Every 2 years", three_year: "Every 3 years",
+    four_year: "Every 4 years", five_year: "Every 5 years",
   };
   const RECUR_MONTHS = {
     monthly: 1, quarterly: 3, semiannual: 6, annual: 12,
-    biennial: 24, three_year: 36, five_year: 60,
+    biennial: 24, three_year: 36, four_year: 48, five_year: 60,
   };
   const STATUS_LABEL = { open: "Open", in_progress: "In progress", done: "Done" };
   const VENDOR_STATUS_LABEL = { contracted: "Under contract", recommended: "Recommended", past: "No longer used" };
@@ -35,11 +36,11 @@
     const d = (offsetDays) => {
       const x = new Date(today);
       x.setDate(x.getDate() + offsetDays);
-      return x.toISOString().slice(0, 10);
+      return ymd(x);
     };
     const members = [
-      { id: uid(), name: "Sample President", position: "President", email: "president@example.com", phone: "", apartment: "1" },
-      { id: uid(), name: "Sample Treasurer", position: "Treasurer", email: "treasurer@example.com", phone: "", apartment: "2" },
+      { id: uid(), name: "Sample President", email: "president@example.com", phone: "", apartment: "1" },
+      { id: uid(), name: "Sample Treasurer", email: "treasurer@example.com", phone: "", apartment: "2" },
     ];
     const vendors = [
       { id: uid(), name: "Sample Cleaning Co", service: "Janitorial", contact_name: "", email: "office@example.com", phone: "(555) 010-4411", website: "", notes: "", status: "contracted", cost: 500, cost_period: "monthly" },
@@ -49,13 +50,17 @@
       { id: uid(), name: "Sample Water Account", category: "Utilities", account_number: "0000000000", portal_url: "https://example.com", username: "building@example.com", notes: "" },
       { id: uid(), name: "Sample City Portal", category: "City portal", account_number: null, portal_url: "https://example.com", username: "board@example.com", notes: "" },
     ];
-    const m = (i) => members[i].id, v = (i) => vendors[i].id;
+    const roles = [
+      { id: uid(), name: "President", member_id: members[0].id, position: 0 },
+      { id: uid(), name: "Treasurer", member_id: members[1].id, position: 1 },
+    ];
+    const m = (i) => roles[i].id, v = (i) => vendors[i].id;
     const tasks = [
-      { id: uid(), title: "Sample overdue project", description: "This is demo data.", category: "Maintenance", status: "open", priority: "high", due_date: d(-40), last_completed_on: "2019-01-01", recurrence: "none", estimated_cost: 4000, assignee_id: m(0), vendor_id: null, completed_at: null },
-      { id: uid(), title: "Sample inspection", description: "", category: "Inspections", status: "open", priority: "normal", due_date: d(12), last_completed_on: null, recurrence: "annual", estimated_cost: 1500, assignee_id: m(1), vendor_id: v(0), completed_at: null },
-      { id: uid(), title: "Sample filing", description: "", category: "Legal & Compliance", status: "in_progress", priority: "high", due_date: d(60), last_completed_on: null, recurrence: "annual", estimated_cost: null, assignee_id: m(0), vendor_id: null, completed_at: null },
-      { id: uid(), title: "Sample completed item", description: "", category: "Financial", status: "done", priority: "normal", due_date: d(-90), last_completed_on: null, recurrence: "annual", estimated_cost: null, assignee_id: m(1), vendor_id: null, completed_at: new Date(today.getTime() - 88 * 864e5).toISOString() },
-      { id: uid(), title: "Sample item with no date", description: "", category: "Financial", status: "open", priority: "normal", due_date: null, last_completed_on: null, recurrence: "annual", estimated_cost: 150, assignee_id: null, vendor_id: null, completed_at: null },
+      { id: uid(), title: "Sample overdue project", description: "This is demo data.", category: "Maintenance", status: "open", priority: "high", due_date: d(-40), last_completed_on: "2019-01-01", recurrence: "none", estimated_cost: 4000, role_id: m(0), vendor_id: null, completed_at: null },
+      { id: uid(), title: "Sample inspection", description: "", category: "Inspections", status: "open", priority: "normal", due_date: d(12), last_completed_on: null, recurrence: "annual", estimated_cost: 1500, role_id: m(1), vendor_id: v(0), completed_at: null },
+      { id: uid(), title: "Sample filing", description: "", category: "Legal & Compliance", status: "in_progress", priority: "high", due_date: d(60), last_completed_on: null, recurrence: "annual", estimated_cost: null, role_id: m(0), vendor_id: null, completed_at: null },
+      { id: uid(), title: "Sample completed item", description: "", category: "Financial", status: "done", priority: "normal", due_date: d(-90), last_completed_on: null, recurrence: "none", estimated_cost: null, role_id: m(1), vendor_id: null, completed_at: new Date(today.getTime() - 88 * 864e5).toISOString() },
+      { id: uid(), title: "Sample item with no date", description: "", category: "Financial", status: "open", priority: "normal", due_date: null, last_completed_on: null, recurrence: "annual", estimated_cost: 150, role_id: null, vendor_id: null, completed_at: null },
     ];
     const links = [
       { id: uid(), title: "Sample document", url: "https://example.com", kind: "document", responsibility_id: tasks[0].id, vendor_id: null, account_id: null },
@@ -74,11 +79,11 @@
       { id: uid(), name: "Sample Light", category: "Lighting", brand: "Sample Brand", code: null,
         location: "Hallway", url: "https://example.com", color_hex: null, notes: "", position: 1 },
     ];
-    return { members, vendors, tasks, links, accounts, settings, schedules, scheduleSlots, fixtures };
+    return { members, roles, vendors, tasks, links, accounts, settings, schedules, scheduleSlots, fixtures };
   }
 
   const TABLE = {
-    members: "board_members", vendors: "vendors",
+    members: "board_members", roles: "board_roles", vendors: "vendors",
     tasks: "responsibilities", links: "links", accounts: "accounts",
     settings: "reminder_settings",
     schedules: "schedules", scheduleSlots: "schedule_slots", fixtures: "fixtures",
@@ -108,7 +113,7 @@
     }
     return {
       async load() {
-        const [members, vendors, tasks, links, accounts, settings, schedules, scheduleSlots, fixtures] = await Promise.all([
+        const [members, vendors, tasks, links, accounts, settings, schedules, scheduleSlots, fixtures, roles] = await Promise.all([
           q(client.from(TABLE.members).select("*").order("name")),
           q(client.from(TABLE.vendors).select("*").order("name")),
           q(client.from(TABLE.tasks).select("*").order("due_date", { ascending: true, nullsFirst: false })),
@@ -120,9 +125,10 @@
           q(client.from(TABLE.schedules).select("*").order("position")).catch(() => []),
           q(client.from(TABLE.scheduleSlots).select("*").order("position")).catch(() => []),
           q(client.from(TABLE.fixtures).select("*").order("position")).catch(() => []),
+          q(client.from(TABLE.roles).select("*").order("position")).catch(() => []),
         ]);
         return {
-          members, vendors, tasks, links, accounts,
+          members, roles, vendors, tasks, links, accounts,
           settings: settings[0] || null, schedules, scheduleSlots, fixtures,
         };
       },
@@ -148,7 +154,7 @@
   // ------------------------------------------------------------------
   // State and helpers
   // ------------------------------------------------------------------
-  let S = { members: [], vendors: [], tasks: [], links: [], accounts: [],
+  let S = { members: [], roles: [], vendors: [], tasks: [], links: [], accounts: [],
     settings: null, schedules: [], scheduleSlots: [], fixtures: [] };
   const $ = (id) => document.getElementById(id);
 
@@ -157,7 +163,12 @@
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
-  function todayStr() { return new Date().toISOString().slice(0, 10); }
+  // Dates are local, so "today" does not roll over early in the evening.
+  function ymd(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
+      "-" + String(d.getDate()).padStart(2, "0");
+  }
+  function todayStr() { return ymd(new Date()); }
   function daysUntil(dateStr) {
     if (!dateStr) return null;
     const a = new Date(todayStr() + "T00:00:00");
@@ -175,7 +186,7 @@
   }
   function dueText(t) {
     if (t.status === "done") {
-      const when = t.completed_at ? t.completed_at.slice(0, 10) : t.due_date;
+      const when = t.completed_at ? ymd(new Date(t.completed_at)) : t.due_date;
       return { text: when ? "Completed " + fmtDate(when) : "Completed", cls: "" };
     }
     const n = daysUntil(t.due_date);
@@ -192,22 +203,48 @@
     return { text: "Due " + fmtDate(t.due_date), cls: "" };
   }
   function memberById(id) { return S.members.find((m) => m.id === id); }
+  function roleById(id) { return S.roles.find((r) => r.id === id); }
+  function sortedRoles() {
+    return S.roles.slice().sort((a, b) =>
+      (a.position || 0) - (b.position || 0) || a.name.localeCompare(b.name));
+  }
+  function roleLabel(r) {
+    const m = memberById(r.member_id);
+    return r.name + ", " + (m ? m.name : "vacant");
+  }
+  function rolesOf(memberId) { return sortedRoles().filter((r) => r.member_id === memberId); }
+  function tasksOfMember(memberId) {
+    const ids = rolesOf(memberId).map((r) => r.id);
+    return S.tasks.filter((t) => t.status !== "done" && ids.includes(t.role_id));
+  }
   function vendorById(id) { return S.vendors.find((v) => v.id === id); }
   function accountById(id) { return S.accounts.find((a) => a.id === id); }
   function initials(name) {
     return name.split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
   }
-  function advanceDate(dateStr, recurrence) {
+  function advanceDate(dateStr, recurrence, steps) {
     const months = RECUR_MONTHS[recurrence];
     if (!months || !dateStr) return null;
     const d = new Date(dateStr + "T00:00:00");
     const day = d.getDate();
     d.setDate(1);
-    d.setMonth(d.getMonth() + months);
+    d.setMonth(d.getMonth() + months * (steps || 1));
     const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
     d.setDate(Math.min(day, lastDay));
-    return d.toISOString().slice(0, 10);
+    return ymd(d);
   }
+  // The next due date after completing a repeating item today. Steps from the
+  // old due date so the day of the month holds, and skips any cycles already
+  // in the past. With no due date it counts from today.
+  function nextDue(dueDate, recurrence) {
+    const from = dueDate || todayStr();
+    for (let k = 1; k < 600; k++) {
+      const d = advanceDate(from, recurrence, k);
+      if (!d || d > todayStr()) return d;
+    }
+    return null;
+  }
+  function isRecurring(t) { return !!RECUR_MONTHS[t.recurrence]; }
   function safeUrl(u) {
     const s = String(u || "").trim();
     return /^https?:\/\//i.test(s) ? s : "https://" + s;
@@ -231,21 +268,26 @@
   // Rendering
   // ------------------------------------------------------------------
   function assigneeChip(t) {
-    const m = memberById(t.assignee_id);
-    if (!m) return '<span class="assignee-chip"><span class="avatar avatar-none" aria-hidden="true">NA</span>Unassigned</span>';
-    return '<span class="assignee-chip"><span class="avatar" aria-hidden="true">' +
-      esc(initials(m.name)) + "</span>" + esc(m.name) + "</span>";
+    const r = roleById(t.role_id);
+    if (!r) return '<span class="assignee-chip"><span class="avatar avatar-none" aria-hidden="true">NA</span>Unassigned</span>';
+    const m = memberById(r.member_id);
+    return '<span class="assignee-chip"><span class="avatar' + (m ? "" : " avatar-none") + '" aria-hidden="true">' +
+      esc(initials(m ? m.name : r.name)) + '</span><span><span class="role-name">' + esc(r.name) +
+      "</span>, " + esc(m ? m.name : "vacant") + "</span></span>";
   }
 
-  function taskCard(t) {
-    const due = dueText(t);
+  // doneOn is set when the card sits in the completed list. A repeating item
+  // stays open after it is done, so there the card shows when it was done.
+  function taskCard(t, doneOn) {
+    const due = doneOn ? { text: "Done " + fmtDate(doneOn), cls: "" } : dueText(t);
     const v = vendorById(t.vendor_id);
     const bits = ['<span class="badge badge-cat">' + esc(t.category || "Other") + "</span>"];
     if (t.priority === "high" && t.status !== "done") bits.push('<span class="badge badge-high">High priority</span>');
     if (t.recurrence && t.recurrence !== "none") bits.push("<span>Repeats " + RECUR_LABEL[t.recurrence].toLowerCase() + "</span>");
     if (t.estimated_cost != null) bits.push('<span class="badge badge-cost">' + esc(fmtMoney(t.estimated_cost)) + "</span>");
     if (v) bits.push("<span>" + esc(v.name) + "</span>");
-    const mod = t.status === "done" ? " is-done" : due.cls ? " is-" + due.cls : "";
+    if (doneOn && t.status !== "done" && t.due_date) bits.push("<span>Next due " + esc(fmtDate(t.due_date)) + "</span>");
+    const mod = (doneOn || t.status === "done") ? " is-done" : due.cls ? " is-" + due.cls : "";
     return '<button type="button" class="task-card' + mod + '" data-task="' + t.id + '">' +
       '<span class="row1"><span class="title">' + esc(t.title) + "</span>" +
       '<span class="due ' + due.cls + '">' + esc(due.text) + "</span></span>" +
@@ -254,7 +296,7 @@
 
   function renderList(elId, tasks, emptyMsg) {
     $(elId).innerHTML = tasks.length
-      ? tasks.map(taskCard).join("")
+      ? tasks.map((t) => taskCard(t)).join("")
       : '<p class="none">' + emptyMsg + "</p>";
   }
 
@@ -268,8 +310,11 @@
       .sort((a, b) => a.due_date.localeCompare(b.due_date));
     const nodate = open.filter((t) => !t.due_date);
     const inprog = S.tasks.filter((t) => t.status === "in_progress");
-    const done = S.tasks.filter((t) => t.status === "done")
-      .sort((a, b) => (b.completed_at || "").localeCompare(a.completed_at || "")).slice(0, 6);
+    const done = S.tasks.map((t) => ({
+      t: t,
+      on: t.status === "done" ? (t.completed_at ? ymd(new Date(t.completed_at)) : t.due_date)
+        : isRecurring(t) ? t.last_completed_on : null,
+    })).filter((x) => x.on).sort((a, b) => b.on.localeCompare(a.on)).slice(0, 6);
 
     const upcomingCost = open.reduce((sum, t) => sum + (Number(t.estimated_cost) || 0), 0);
     $("stats").innerHTML =
@@ -285,7 +330,9 @@
     renderList("list-soon", soon, "Nothing is due in the next 30 days.");
     renderList("list-later", later.slice(0, 8), "Nothing scheduled further out.");
     renderList("list-inprogress", inprog, "Nothing is in progress.");
-    renderList("list-done", done, "Nothing completed yet.");
+    $("list-done").innerHTML = done.length
+      ? done.map((x) => taskCard(x.t, x.on)).join("")
+      : '<p class="none">Nothing completed yet.</p>';
     renderList("list-nodate", nodate, "Everything has a date.");
   }
 
@@ -314,7 +361,9 @@
     if (search) rows = rows.filter((t) => (t.title + " " + (t.description || "")).toLowerCase().includes(search));
     if (fStatus) rows = rows.filter((t) => t.status === fStatus);
     if (fCat) rows = rows.filter((t) => (t.category || "Other") === fCat);
-    if (fAss) rows = rows.filter((t) => fAss === "none" ? !t.assignee_id : t.assignee_id === fAss);
+    if (fAss) rows = rows.filter((t) => fAss === "none" ? !roleById(t.role_id) : t.role_id === fAss);
+    const active = [fStatus, fCat, fAss].filter(Boolean).length;
+    $("filter-toggle").textContent = active ? "Filter (" + active + ")" : "Filter";
 
     const rank = { open: 0, in_progress: 0, done: 1 };
     rows.sort((a, b) => (rank[a.status] - rank[b.status]) ||
@@ -386,27 +435,52 @@
     $("account-empty").hidden = S.accounts.length > 0;
   }
 
+  let boardMemberId = null;   // whose responsibilities are listed on the Board tab
+
   function renderMembers() {
+    $("role-grid").innerHTML = sortedRoles().map((r) => {
+      const m = memberById(r.member_id);
+      const count = S.tasks.filter((t) => t.role_id === r.id && t.status !== "done").length;
+      return '<button type="button" class="info-card" data-role="' + r.id + '">' +
+        "<h3>" + esc(r.name) + "</h3>" +
+        '<div class="sub">' + esc(m ? m.name : "Vacant") + "</div>" +
+        '<div class="contact-line"><span class="lbl">Open items:</span> ' + count + "</div></button>";
+    }).join("") || '<p class="none">No roles yet.</p>';
+
     $("member-grid").innerHTML = S.members.map((m) => {
-      const count = S.tasks.filter((t) => t.assignee_id === m.id && t.status !== "done").length;
-      const sub = [m.position || "Board member"];
+      const count = tasksOfMember(m.id).length;
+      const sub = [rolesOf(m.id).map((r) => r.name).join(", ") || "No role"];
       if (m.apartment) sub.push("Apartment " + m.apartment);
-      return '<button type="button" class="info-card" data-member="' + m.id + '">' +
+      const on = boardMemberId === m.id;
+      return '<div class="info-card info-card-static">' +
         "<h3>" + esc(m.name) + "</h3>" +
         '<div class="sub">' + esc(sub.join(", ")) + "</div>" +
-        (m.email ? '<div class="contact-line"><span class="lbl">Email:</span> <a href="mailto:' + esc(m.email) + '" onclick="event.stopPropagation()">' + esc(m.email) + "</a></div>" : "") +
-        (m.phone ? '<div class="contact-line"><span class="lbl">Phone:</span> <a href="tel:' + esc(m.phone) + '" onclick="event.stopPropagation()">' + esc(m.phone) + "</a></div>" : "") +
-        '<div class="contact-line"><span class="lbl">Open items:</span> ' + count + "</div></button>";
+        (m.email ? '<div class="contact-line"><span class="lbl">Email:</span> <a href="mailto:' + esc(m.email) + '">' + esc(m.email) + "</a></div>" : "") +
+        (m.phone ? '<div class="contact-line"><span class="lbl">Phone:</span> <a href="tel:' + esc(m.phone) + '">' + esc(m.phone) + "</a></div>" : "") +
+        '<div class="card-actions">' +
+          '<button type="button" class="btn' + (on ? " is-on" : "") + '" data-member-tasks="' + m.id + '" aria-expanded="' + on +
+            '" aria-controls="member-tasks">Responsibilities (' + count + ")</button>" +
+          '<button type="button" class="btn" data-member="' + m.id + '">Edit</button>' +
+        "</div></div>";
     }).join("");
     $("member-empty").hidden = S.members.length > 0;
+
+    const who = memberById(boardMemberId);
+    $("member-tasks").hidden = !who;
+    if (who) {
+      const list = tasksOfMember(who.id).sort((a, b) =>
+        (a.due_date || "9999").localeCompare(b.due_date || "9999"));
+      $("member-tasks-title").textContent = "Responsibilities for " + who.name;
+      renderList("member-tasks-list", list, "Nothing assigned.");
+    }
   }
 
   function renderFilterOptions() {
     $("filter-category").innerHTML = '<option value="">All categories</option>' +
       CATEGORIES.map((c) => "<option>" + esc(c) + "</option>").join("");
     $("filter-assignee").innerHTML =
-      '<option value="">Everyone</option><option value="none">Unassigned</option>' +
-      S.members.map((m) => '<option value="' + m.id + '">' + esc(m.name) + "</option>").join("");
+      '<option value="">All roles</option><option value="none">Unassigned</option>' +
+      sortedRoles().map((r) => '<option value="' + r.id + '">' + esc(roleLabel(r)) + "</option>").join("");
   }
 
   function renderAll() {
@@ -423,25 +497,24 @@
   // ------------------------------------------------------------------
   // Completing a responsibility
   // ------------------------------------------------------------------
+  // A repeating item is never left done. Completing it records today as the
+  // last time it was done and moves the due date to the next cycle.
+  function rollForward(dueDate, recurrence) {
+    return {
+      status: "open", completed_at: null,
+      last_completed_on: todayStr(),
+      due_date: nextDue(dueDate, recurrence),
+    };
+  }
+
   async function completeTask(t) {
     try {
-      const now = new Date().toISOString();
-      await getStore().update("tasks", t.id, { status: "done", completed_at: now });
-      Object.assign(t, { status: "done", completed_at: now });
-      if (t.recurrence && t.recurrence !== "none" && t.due_date) {
-        const created = await getStore().insert("tasks", {
-          title: t.title, description: t.description, category: t.category,
-          status: "open", priority: t.priority,
-          due_date: advanceDate(t.due_date, t.recurrence),
-          last_completed_on: now.slice(0, 10),
-          recurrence: t.recurrence, estimated_cost: t.estimated_cost,
-          assignee_id: t.assignee_id, vendor_id: t.vendor_id, completed_at: null,
-        });
-        S.tasks.push(created);
-        toast("Marked done. The next one is scheduled for " + fmtDate(created.due_date) + ".");
-      } else {
-        toast("Marked done.");
-      }
+      const patch = isRecurring(t)
+        ? rollForward(t.due_date, t.recurrence)
+        : { status: "done", completed_at: new Date().toISOString() };
+      await getStore().update("tasks", t.id, patch);
+      Object.assign(t, patch);
+      toast(isRecurring(t) ? "Marked done. Next due " + fmtDate(t.due_date) + "." : "Marked done.");
       renderAll();
     } catch (e) { fail(e); }
   }
@@ -629,7 +702,8 @@
     $("tf-lastdone").value = t ? (t.last_completed_on || "") : "";
     $("tf-cost").value = t && t.estimated_cost != null ? t.estimated_cost : "";
     $("tf-recurrence").value = t ? (t.recurrence || "none") : "none";
-    fillSelect($("tf-assignee"), S.members, t ? t.assignee_id : "", "Unassigned");
+    fillSelect($("tf-assignee"), sortedRoles().map((r) => ({ id: r.id, name: roleLabel(r) })),
+      t ? t.role_id : "", "Unassigned");
     fillSelect($("tf-vendor"), S.vendors, t ? t.vendor_id : "", "None");
     $("tf-status").value = t ? t.status : "open";
     $("tf-delete").hidden = !t;
@@ -643,7 +717,7 @@
     const id = $("tf-id").value;
     const existing = id ? S.tasks.find((t) => t.id === id) : null;
     const wasDone = existing && existing.status === "done";
-    const nowDone = $("tf-status").value === "done";
+    let nowDone = $("tf-status").value === "done";
     const costVal = $("tf-cost").value.trim();
     const row = {
       title: $("tf-title").value.trim(),
@@ -654,11 +728,14 @@
       last_completed_on: $("tf-lastdone").value || null,
       estimated_cost: costVal === "" ? null : Number(costVal),
       recurrence: $("tf-recurrence").value,
-      assignee_id: $("tf-assignee").value || null,
+      role_id: $("tf-assignee").value || null,
       vendor_id: $("tf-vendor").value || null,
       status: $("tf-status").value,
       completed_at: nowDone ? (existing && existing.completed_at) || new Date().toISOString() : null,
     };
+    // Same rule as the Mark done button.
+    const rolled = !wasDone && nowDone && isRecurring(row);
+    if (rolled) { Object.assign(row, rollForward(row.due_date, row.recurrence)); nowDone = false; }
     try {
       let saved;
       if (existing) {
@@ -671,17 +748,7 @@
       }
       await saveLinks(taskLinkEditor, "responsibility_id", saved.id);
       closeModal("task-modal");
-      if (!wasDone && nowDone && row.recurrence !== "none" && row.due_date) {
-        const created = await getStore().insert("tasks", Object.assign({}, row, {
-          status: "open", completed_at: null,
-          last_completed_on: todayStr(),
-          due_date: advanceDate(row.due_date, row.recurrence),
-        }));
-        S.tasks.push(created);
-        toast("Saved. The next one is scheduled for " + fmtDate(created.due_date) + ".");
-      } else {
-        toast("Saved.");
-      }
+      toast(rolled ? "Saved. Next due " + fmtDate(row.due_date) + "." : "Saved.");
       renderAll();
     } catch (err) { fail(err); }
   });
@@ -829,7 +896,6 @@
     $("member-modal-title").textContent = m ? "Edit board member" : "Add board member";
     $("mf-id").value = m ? m.id : "";
     $("mf-name").value = m ? m.name : "";
-    $("mf-position").value = m ? (m.position || "") : "";
     $("mf-apartment").value = m ? (m.apartment || "") : "";
     $("mf-email").value = m ? (m.email || "") : "";
     $("mf-phone").value = m ? (m.phone || "") : "";
@@ -843,7 +909,6 @@
     const id = $("mf-id").value;
     const row = {
       name: $("mf-name").value.trim(),
-      position: $("mf-position").value.trim() || null,
       apartment: $("mf-apartment").value.trim() || null,
       email: $("mf-email").value.trim() || null,
       phone: $("mf-phone").value.trim() || null,
@@ -865,11 +930,12 @@
 
   $("mf-delete").addEventListener("click", async () => {
     const id = $("mf-id").value;
-    if (!id || !confirm("Remove this board member? Their assignments become unassigned.")) return;
+    if (!id || !confirm("Remove this board member? Their roles become vacant.")) return;
     try {
       await getStore().remove("members", id);
       S.members = S.members.filter((m) => m.id !== id);
-      S.tasks.forEach((t) => { if (t.assignee_id === id) t.assignee_id = null; });
+      S.roles.forEach((r) => { if (r.member_id === id) r.member_id = null; });
+      if (boardMemberId === id) boardMemberId = null;
       closeModal("member-modal");
       toast("Removed.");
       renderFilterOptions();
@@ -877,9 +943,50 @@
     } catch (e) { fail(e); }
   });
 
-  // ------------------------------------------------------------------
-  // Global events
-  // ------------------------------------------------------------------
+  // ---------------- role modal ----------------
+  function openRoleModal(r) {
+    $("role-modal-title").textContent = r ? "Edit role" : "Add role";
+    $("rf-id").value = r ? r.id : "";
+    $("rf-name").value = r ? r.name : "";
+    fillSelect($("rf-member"), S.members, r ? r.member_id : "", "Vacant");
+    $("rf-delete").hidden = !r;
+    openModal("role-modal");
+    $("rf-name").focus();
+  }
+
+  $("role-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const id = $("rf-id").value;
+    const row = { name: $("rf-name").value.trim(), member_id: $("rf-member").value || null };
+    try {
+      if (id) {
+        const existing = roleById(id);
+        const patch = await getStore().update("roles", id, row);
+        Object.assign(existing, patch || row);
+      } else {
+        S.roles.push(await getStore().insert("roles", Object.assign({ position: S.roles.length }, row)));
+      }
+      closeModal("role-modal");
+      toast("Saved.");
+      renderFilterOptions();
+      renderAll();
+    } catch (err) { fail(err); }
+  });
+
+  $("rf-delete").addEventListener("click", async () => {
+    const id = $("rf-id").value;
+    if (!id || !confirm("Delete this role? Its responsibilities become unassigned.")) return;
+    try {
+      await getStore().remove("roles", id);
+      S.roles = S.roles.filter((r) => r.id !== id);
+      S.tasks.forEach((t) => { if (t.role_id === id) t.role_id = null; });
+      closeModal("role-modal");
+      toast("Deleted.");
+      renderFilterOptions();
+      renderAll();
+    } catch (e) { fail(e); }
+  });
+
   // ------------------------------------------------------------------
   // Fixtures, the building's paint colours, fittings and hardware
   // ------------------------------------------------------------------
@@ -1398,15 +1505,33 @@
     if (fx) { const x = S.fixtures.find((y) => y.id === fx.dataset.fixture); if (x) openFixtureModal(x); return; }
     const sc = e.target.closest("[data-schedule]");
     if (sc) { const x = S.schedules.find((y) => y.id === sc.dataset.schedule); if (x) openScheduleModal(x); return; }
+    const rc = e.target.closest("[data-role]");
+    if (rc) { const r = roleById(rc.dataset.role); if (r) openRoleModal(r); return; }
+    const mt = e.target.closest("[data-member-tasks]");
+    if (mt) {
+      boardMemberId = boardMemberId === mt.dataset.memberTasks ? null : mt.dataset.memberTasks;
+      renderMembers();
+      if (boardMemberId) {
+        $("member-tasks-title").focus();
+        $("member-tasks").scrollIntoView({ block: "nearest" });
+      }
+      return;
+    }
     const mc = e.target.closest("[data-member]");
     if (mc) { const m = memberById(mc.dataset.member); if (m) openMemberModal(m); return; }
   });
 
   $("btn-new-task").addEventListener("click", () => openTaskModal(null));
-  $("btn-new-task-side").addEventListener("click", () => { closeSidebar(); openTaskModal(null); });
   $("btn-new-vendor").addEventListener("click", () => openVendorModal(null));
   $("btn-new-account").addEventListener("click", () => openAccountModal(null));
   $("btn-new-member").addEventListener("click", () => openMemberModal(null));
+  $("btn-new-role").addEventListener("click", () => openRoleModal(null));
+  $("filter-toggle").addEventListener("click", () => {
+    const open = $("filter-panel").hidden;
+    $("filter-panel").hidden = !open;
+    $("filter-toggle").setAttribute("aria-expanded", String(open));
+    if (open) $("filter-status").focus();
+  });
 
   ["task-search", "filter-status", "filter-category", "filter-assignee"].forEach((id) =>
     $(id).addEventListener("input", renderTaskTable));
@@ -1461,6 +1586,7 @@
     try {
       S = await getStore().load();
       S.accounts = S.accounts || [];
+      S.roles = S.roles || [];
       S.settings = Object.assign({}, DEFAULT_SETTINGS, S.settings || {});
       S.schedules = S.schedules || [];
       S.scheduleSlots = S.scheduleSlots || [];
@@ -1479,6 +1605,7 @@
   function boot() {
     const name = CFG.BUILDING_NAME || "372 12th";
     $("brand-name").textContent = name;
+    $("sidebar-brand").textContent = name;
     $("gate-title").textContent = name;
     document.title = name;
     if (PASSWORD && !isUnlocked()) {

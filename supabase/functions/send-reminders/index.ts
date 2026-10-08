@@ -47,7 +47,7 @@ export type Task = {
   category: string;
   estimated_cost: number | null;
   last_completed_on: string | null;
-  assignee: { name: string; email: string | null } | null;
+  role: { name: string; member: { name: string; email: string | null } | null } | null;
   vendor: Vendor | null;
   links: { title: string | null; url: string; sort_order: number | null }[] | null;
 };
@@ -161,6 +161,12 @@ const L = {
   link: 'style="color:#1d4ed8"',
 };
 
+/** The role and whoever holds it, such as "Treasurer, Mitch Herrera". */
+function responsible(t: Task, fallback: string): string {
+  if (!t.role) return fallback;
+  return t.role.name + ", " + (t.role.member?.name || "vacant");
+}
+
 /** One responsibility, in full, with everything needed to act on it. */
 function detailedItem(t: Task, today: string): string {
   const rows: string[] = [];
@@ -168,8 +174,8 @@ function detailedItem(t: Task, today: string): string {
     ? `${prettyDate(t.due_date)}, ${overdueLabel(t.due_date, today)}`
     : prettyDate(t.due_date);
   rows.push(`<p ${L.row}><span ${L.lbl}>Due:</span> ${escapeHtml(when)}</p>`);
-  rows.push(`<p ${L.row}><span ${L.lbl}>Responsible:</span> ${escapeHtml(t.assignee?.name || "Nobody assigned yet")}` +
-    (t.assignee?.email ? ` (${escapeHtml(t.assignee.email)})` : "") + "</p>");
+  rows.push(`<p ${L.row}><span ${L.lbl}>Responsible:</span> ${escapeHtml(responsible(t, "Nobody assigned yet"))}` +
+    (t.role?.member?.email ? ` (${escapeHtml(t.role.member.email)})` : "") + "</p>");
   if (t.estimated_cost != null) {
     rows.push(`<p ${L.row}><span ${L.lbl}>Estimated cost:</span> ${escapeHtml(money(t.estimated_cost))}</p>`);
   }
@@ -203,7 +209,7 @@ function detailedItem(t: Task, today: string): string {
 /** One responsibility, stripped back to the name and who has it. */
 function slimItem(t: Task): string {
   return `<p ${L.slim}><strong>${escapeHtml(t.title)}</strong>, ` +
-    `${escapeHtml(t.assignee?.name || "nobody assigned yet")}` +
+    `${escapeHtml(responsible(t, "nobody assigned yet"))}` +
     `<span style="color:#47576a"> (${escapeHtml(prettyDate(t.due_date))})</span></p>`;
 }
 
@@ -273,7 +279,7 @@ export function buildMessages(tasks: Task[], s: Settings, opts: { now: Date; app
   if (s.delivery_mode === "per_person") {
     const byEmail = new Map<string, Task[]>();
     for (const t of tasks) {
-      const email = t.assignee?.email || s.digest_email;
+      const email = t.role?.member?.email || s.digest_email;
       if (!email) continue;
       byEmail.set(email, [...(byEmail.get(email) ?? []), t]);
     }
@@ -332,7 +338,7 @@ if (import.meta.main) {
       const { data, error } = await supabase
         .from("responsibilities")
         .select("id,title,description,due_date,priority,category,estimated_cost,last_completed_on," +
-                "assignee:board_members(name,email)," +
+                "role:board_roles(name,member:board_members(name,email))," +
                 "vendor:vendors(name,contact_name,email,phone,website)," +
                 "links(title,url,sort_order)")
         .neq("status", "done")

@@ -102,9 +102,11 @@ body.locked > .topbar, body.locked > .container, body.locked > .demo-banner { di
   max-width: 1240px; margin: 0 auto; padding: 12px 20px;
   display: flex; align-items: center; gap: 20px;
 }
-.brand { font-weight: 700; font-size: 20px; white-space: nowrap; }
+.brand { font-weight: 700; font-size: 20px; white-space: nowrap; display: flex; align-items: center; gap: 10px; }
+.brand img { display: block; border-radius: 8px; }
+.gate-logo { display: block; margin: 0 auto; border-radius: 18px; }
 
-/* Eight tabs have to fit on one line. Below the breakpoint they move into
+/* The logo and eight tabs have to fit on one line. Below the breakpoint they move into
    the sidebar instead of wrapping. */
 .tabs { display: flex; gap: 4px; flex: 1; flex-wrap: nowrap; }
 .tab {
@@ -156,7 +158,6 @@ body.locked > .topbar, body.locked > .container, body.locked > .demo-banner { di
 }
 .sidebar-nav { display: flex; flex-direction: column; gap: 6px; padding: 16px; }
 .sidebar-nav .tab { width: 100%; text-align: left; font-size: 17px; padding: 14px 16px; min-height: 52px; white-space: normal; }
-.sidebar-actions { padding: 0 16px 20px; margin-top: auto; }
 
 /* ---------- layout ---------- */
 .container { max-width: 1240px; margin: 0 auto; padding: 28px 20px 90px; }
@@ -299,9 +300,12 @@ textarea.input { min-height: 80px; }
 .avatar-none { background: var(--slate-soft); color: var(--slate); border-color: var(--border); }
 
 /* ---------- filters and table ---------- */
+.toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.toolbar .search-field { flex: 0 1 380px; }
+.toolbar-end { margin-left: auto; }
+.btn[aria-expanded="true"], .btn.is-on { background: var(--primary-soft); border-color: var(--primary); color: var(--primary-dark); }
 .filter-bar { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
-.filter-bar .field { flex: 0 0 auto; min-width: 170px; }
-.filter-bar .search-field { flex: 1 1 260px; }
+.filter-bar .field { flex: 0 1 220px; min-width: 170px; }
 
 .table-wrap {
   background: var(--surface); border: 1px solid var(--border);
@@ -350,6 +354,11 @@ textarea.input { min-height: 80px; }
   color: var(--text); width: 100%; display: block;
 }
 .info-card:hover { background: var(--surface-alt); border-color: var(--border-strong); }
+.info-card-static { cursor: default; }
+.info-card-static:hover { background: var(--surface); border-color: var(--border); }
+.card-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.role-name { font-weight: 700; color: var(--text); }
+#member-tasks-title:focus-visible { box-shadow: none; }
 .info-card h3 { margin: 0 0 4px; font-size: 18px; }
 .info-card .sub { color: var(--text-soft); font-size: 15px; margin-bottom: 10px; }
 .contact-line { font-size: 15px; color: var(--text-soft); margin-top: 6px; }
@@ -472,7 +481,6 @@ textarea.input { min-height: 80px; }
      into the slide out menu instead. */
   .menu-btn { display: inline-flex; }
   .topbar .tabs { display: none; }
-  .topbar-add { display: none; }
   .topbar-inner { gap: 14px; }
   .brand { flex: 1; }
 }
@@ -483,6 +491,8 @@ textarea.input { min-height: 80px; }
   .link-add { grid-template-columns: 1fr; }
   .section-head { flex-direction: column; align-items: stretch; }
   .section-head .btn { width: 100%; }
+  .toolbar .search-field { flex: 1 1 100%; }
+  .filter-bar .field { flex: 1 1 100%; }
   .doc-row { flex-wrap: wrap; }
   .doc-fields, .slot-fields { grid-template-columns: 1fr; width: 100%; }
   .doc-buttons { width: 100%; }

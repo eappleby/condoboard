@@ -40,8 +40,8 @@ replies in chat:
   the device instead.
 * `app.js` uses a `store` abstraction with two implementations,
   `makeDemoStore` and `makeSupabaseStore`, sharing
-  `load / insert / update / remove(kind, ...)` where kind is one of members,
-  vendors, tasks, links, accounts. The UI holds all state in `S` and patches
+  `load / insert / update / remove(kind, ...)` where kind is a key of `TABLE`,
+  such as members, roles, vendors, tasks, links, accounts. The UI holds all state in `S` and patches
   it after each successful store call. **Stores must not mutate `S`.** A demo
   store that also pushed rows caused double inserts once.
 * `store` is created lazily through `getStore()` so nothing is fetched before
@@ -49,14 +49,24 @@ replies in chat:
 
 ## Data model
 
-Tables: `board_members`, `vendors`, `responsibilities`, `links`, `accounts`,
-`reminder_settings`, `schedules`, `schedule_slots`, `fixtures`. A link belongs
+Tables: `board_members`, `board_roles`, `vendors`, `responsibilities`,
+`links`, `accounts`, `reminder_settings`, `schedules`, `schedule_slots`,
+`fixtures`. A link belongs
 to exactly one of a responsibility, a vendor, an account, or a fixture, and
 carries a `sort_order` so the board can arrange documents by hand. Adding a
 new owner type means a column on `links`, a branch in `linksFor()`, and the
 new key in the row built by `saveLinks()`.
 RLS is on with wide open policies for `anon`, which is deliberate given there
 is no per person login.
+
+A responsibility points at a role through `role_id`, and a role points at
+whoever holds it through `board_roles.member_id`. Nothing assigns a
+responsibility to a person directly, which is the point: when the board
+changes, only the role holder is edited. `responsibilities.assignee_id` and
+`board_members.position` are dead columns kept for compatibility. Do not
+read or write them. `rolesOf()` and `tasksOfMember()` resolve a person to
+their responsibilities, and the email function joins
+`role:board_roles(name,member:board_members(name,email))`.
 
 `accounts` has no password column and must not get one. The database is
 readable by anyone with the site address, so credentials live in the board
@@ -157,9 +167,10 @@ use the new behaviour.
 
 ## Mobile navigation
 
-Below 1160px the top bar tabs and the Add button are hidden and a hamburger
-opens a left sidebar. The breakpoint is set by how many tabs there are, not
-by a device size. Eight tabs stop fitting at about 1160px, so adding another
+Below 1160px the top bar tabs are hidden and a hamburger opens a left
+sidebar. The top bar holds only the logo, the name and the tabs. Add
+responsibility lives on the Responsibilities toolbar, by Evan's choice. The breakpoint is set by how many tabs there are, not
+by a device size. Eight tabs and the logo stop fitting at about 1160px, so adding another
 tab means testing widths again and probably raising it. `.tabs` is
 `nowrap` so a too-small breakpoint shows as horizontal overflow rather than a
 second row. The tabs exist twice in the markup, once in the top bar
@@ -168,6 +179,25 @@ and once in the sidebar, and `showView()` keeps both copies in sync by
 sidebar when no dialog is open. The sidebar is unhidden before the `open`
 class is added on the next frame, otherwise the slide in animation does not
 run.
+
+## Responsibilities toolbar and Board tab
+
+The toolbar row is search, the Filter button, then Add responsibility pushed
+to the right. The three filter selects sit in `#filter-panel`, hidden until
+Filter is pressed. Hiding the panel does not clear the filters, so the
+button reads "Filter (2)" while any are set.
+
+The Board tab has a Roles grid and a Members grid. Role cards open the role
+modal. Member cards are not buttons, because they hold two buttons of their
+own: Responsibilities, which lists that person's open items under the grid
+through `boardMemberId`, and Edit.
+
+## Logo
+
+`logo.svg` is the monster face from the building's Halloween balcony
+display. `favicon.svg` is a simpler cut that survives 16px. `favicon.png`
+and `apple-touch-icon.png` are renders of those two, so regenerate them if
+the SVGs change.
 
 ## Fixtures
 
@@ -197,18 +227,26 @@ marks whoever is up this month. It handles ranges that wrap past December.
 
 ## Conventions and gotchas
 
-* Recurrence roll forward is client side. Completing a repeating task, either
-  by the Mark done button or through the modal, inserts a fresh row with the
-  next due date. `advanceDate()` clamps to month end. Keep both paths in
-  sync.
+* Recurrence roll forward is client side and in place. Completing a
+  repeating task, by the Mark done button or through the modal, never leaves
+  it done and never inserts a row. `rollForward()` sets it back to open,
+  records today in `last_completed_on`, and moves `due_date` with
+  `nextDue()`, which steps from the old due date past any missed cycles, or
+  from today when there was no date. Both paths call `rollForward()`. Rows
+  that are done and repeating are leftovers from the older behaviour, which
+  inserted a new row each time.
+* The dashboard's Recently completed list therefore also shows open
+  repeating items by `last_completed_on`.
 * Recurrence values are none, monthly, quarterly, semiannual, annual,
-  biennial, three_year, five_year. Adding one means updating the check
+  biennial, three_year, four_year, five_year. Adding one means updating the check
   constraint, `RECUR_LABEL`, `RECUR_MONTHS`, and the select in `index.html`.
 * `[hidden] { display: none !important }` in style.css is what makes hiding
   work, since several classes set `display: flex`. Do not remove it.
 * All user text passes through `esc()` before reaching innerHTML, and all
   outbound URLs pass through `safeUrl()`.
-* Dates are `YYYY-MM-DD` strings compared lexically. Done items show their
+* Dates are `YYYY-MM-DD` strings compared lexically, built in local time by
+  `ymd()`. Do not use `toISOString()` for a date, since it is UTC and rolls
+  to tomorrow in the evening in New York. Done items show their
   completion date and never overdue styling.
 * Items with no due date are a real and expected state, since several seeded
   rows are waiting on Evan to confirm a date. They get their own dashboard
@@ -220,8 +258,10 @@ Serve locally with `python3 -m http.server` and drive demo mode with
 Playwright. Automated tests must pass the gate first.
 
 Worth repeating after changes: the gate, add, edit and delete for every
-record type, Mark done on a recurring item (row count grows by exactly one
-and the next date is right), links add and remove, filters, Escape closing a
+record type including roles, Mark done on a recurring item (row count
+unchanged, status still open, and the next date is right), reassigning a
+role and checking the member's list follows, links add and remove, the
+Filter button and its filters, Escape closing a
 dialog, the settings form including the live summary and the guard on an empty
 digest address, document reorder and rename round trips, schedule editing,
 and the mobile viewport.

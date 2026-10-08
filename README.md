@@ -25,6 +25,7 @@ that password does less than it appears to.
 | --- | --- |
 | `index.html`, `style.css`, `app.js` | The whole web app. No build step. |
 | `config.js` | Supabase address and key, building name, site password. |
+| `logo.svg`, `favicon.svg`, `favicon.png`, `apple-touch-icon.png` | The logo and its browser tab versions. |
 | `supabase/config.toml` | Supabase CLI project config. |
 | `supabase/migrations/*.sql` | Schema and data, applied with `supabase db push`. |
 | `supabase/functions/send-reminders/index.ts` | Edge Function that emails reminders. |
@@ -38,18 +39,22 @@ sample data and nothing is saved.
 * **Dashboard.** Overdue, due in the next 30 days, coming up later, in
   progress, recently completed, and anything with no date set. Five counters
   across the top, including the estimated cost of all open work.
-* **Responsibilities.** A searchable, filterable list. Each item carries a
-  category, priority, due date, the date it was last done, an estimated cost,
-  an assignee, an optional vendor, a repeat interval, and attached links.
-* **Recurring duties.** Mark a repeating item done and the next occurrence is
-  created automatically. Intervals run from monthly through every five years,
-  which covers the FDNY sprinkler test.
+* **Responsibilities.** A searchable list, with status, category and role
+  filters behind the Filter button. Each item carries a category, priority,
+  due date, the date it was last done, an estimated cost, a board role, an
+  optional vendor, a repeat interval, and attached links.
+* **Recurring duties.** Mark a repeating item done and it stays open. Today
+  is recorded as the last time it was done and the due date moves to the
+  next cycle. Intervals run from monthly through every five years.
 * **Vendors.** Contact details, contract cost and period, notes, and attached
   documents. Split into vendors under contract and vendors that are only
   recommended so far.
 * **Accounts.** Utility accounts and city portals with account numbers,
   usernames, and links. There is no password field, on purpose.
-* **Board.** Members with position, apartment, email and phone.
+* **Board.** Roles and members. A responsibility is assigned to a role such
+  as Treasurer, and a role is held by a member, so a change of board only
+  means changing who holds each role. Each member card lists that person's
+  open responsibilities.
 * **Fixtures.** What the building uses and what to buy when something is
   replaced: paint colours with swatches, light fittings, hardware, the
   intercom, appliances. Each one can carry documents.
