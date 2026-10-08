@@ -42,7 +42,8 @@ sample data and nothing is saved.
 * **Responsibilities.** A searchable list, with status, category and person
   filters behind the Filter button, sortable by any column heading. Each item carries a category, priority,
   due date, the date it was last done, an estimated cost, a board role, an
-  optional vendor, a repeat interval, and attached links.
+  optional vendor, an optional account or city portal, a repeat interval,
+  and attached links.
 * **Statuses.** Active, Complete or Canceled. The list shows active items
   until the filter says otherwise, and overdue is shown by a red due date.
 * **Ongoing duties.** Choose Ongoing under Repeats for work with no due

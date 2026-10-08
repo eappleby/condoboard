@@ -70,6 +70,7 @@ export type Task = {
   last_completed_on: string | null;
   role: { name: string; member: { id?: string; name: string; email: string | null } | null } | null;
   vendor: Vendor | null;
+  account?: { id: string; name: string; portal_url: string | null } | null;
   links: { title: string | null; url: string; sort_order: number | null }[] | null;
 };
 
@@ -319,6 +320,11 @@ function detailedItem(t: Task, today: string, tone: ToneName): string {
   if (t.last_completed_on) {
     rows.push(`<p ${L.row}><span ${L.lbl}>Last done:</span> ${escapeHtml(prettyDate(t.last_completed_on))}</p>`);
   }
+  if (t.account) {
+    const ac = t.account;
+    rows.push(`<p ${L.row}><span ${L.lbl}>Account:</span> ${a("account/" + ac.id, escapeHtml(ac.name), "text-decoration:underline")}` +
+      (ac.portal_url ? `, <a href="${escapeHtml(safeUrl(ac.portal_url))}" ${L.link}>${escapeHtml(ac.portal_url.replace(/^https?:\/\//i, "").replace(/\/.*$/, ""))}</a>` : "") + "</p>");
+  }
   if (t.vendor) {
     const v = t.vendor;
     const bits = [v.id ? a("vendor/" + v.id, escapeHtml(v.name), "text-decoration:underline") : escapeHtml(v.name)];
@@ -499,6 +505,7 @@ if (import.meta.main) {
                 "role:board_roles(name,member:board_members(id,name,email))," +
                 "vendor:vendors(id,name,contact_name,email,phone,website," +
                 "vendor_contacts(name,email,phone,is_primary,position))," +
+                "account:accounts(id,name,portal_url)," +
                 "links(title,url,sort_order)")
         // Active only. in_progress is a retired value that still counts as
         // active until the status migration has run.

@@ -65,7 +65,7 @@
     const tasks = [
       { id: uid(), title: "Sample overdue project", description: "This is demo data.", category: "Maintenance", status: "open", priority: "high", due_date: d(-40), last_completed_on: "2019-01-01", recurrence: "none", estimated_cost: 4000, role_id: m(0), vendor_id: null, completed_at: null },
       { id: uid(), title: "Sample inspection", description: "", category: "Inspections", status: "open", priority: "normal", due_date: d(12), last_completed_on: null, recurrence: "annual", estimated_cost: 1500, role_id: m(1), vendor_id: v(0), completed_at: null },
-      { id: uid(), title: "Sample filing", description: "", category: "Legal & Compliance", status: "open", priority: "high", due_date: d(60), last_completed_on: null, recurrence: "annual", estimated_cost: null, role_id: m(0), vendor_id: null, completed_at: null },
+      { id: uid(), title: "Sample filing", description: "", category: "Legal & Compliance", status: "open", priority: "high", due_date: d(60), last_completed_on: null, recurrence: "annual", estimated_cost: null, role_id: m(0), vendor_id: null, account_id: null, completed_at: null },
       { id: uid(), title: "Sample completed item", description: "", category: "Financial", status: "done", priority: "normal", due_date: d(-90), last_completed_on: null, recurrence: "none", estimated_cost: null, role_id: m(1), vendor_id: null, completed_at: new Date(today.getTime() - 88 * 864e5).toISOString() },
       { id: uid(), title: "Sample canceled item", description: "", category: "Maintenance", status: "canceled", priority: "normal", due_date: d(20), last_completed_on: null, recurrence: "none", estimated_cost: null, role_id: null, vendor_id: null, completed_at: null },
       { id: uid(), title: "Sample item with no date", description: "", category: "Financial", status: "open", priority: "normal", due_date: null, last_completed_on: null, recurrence: "annual", estimated_cost: 150, role_id: null, vendor_id: null, completed_at: null },
@@ -92,6 +92,7 @@
       { id: uid(), vendor_id: vendors[0].id, name: "Sample Billing", label: "Billing", email: "billing@example.com", phone: null, is_primary: false, position: 1 },
       { id: uid(), vendor_id: vendors[1].id, name: "Sample Electrician", email: "info@example.com", phone: null, is_primary: true, position: 0 },
     ];
+    tasks[2].account_id = accounts[1].id;
     return { members, roles, vendors, contacts, tasks, links, accounts, settings, schedules, scheduleSlots, fixtures };
   }
 
@@ -342,6 +343,8 @@
     if (isRecurring(t)) bits.push("<span>Repeats " + RECUR_LABEL[t.recurrence].toLowerCase() + "</span>");
     if (t.estimated_cost != null) bits.push('<span class="badge badge-cost">' + esc(fmtMoney(t.estimated_cost)) + "</span>");
     if (v) bits.push("<span>" + esc(v.name) + "</span>");
+    const acct = accountById(t.account_id);
+    if (acct) bits.push("<span>" + esc(acct.name) + "</span>");
     if (doneOn && isActive(t) && t.due_date) bits.push("<span>Next due " + esc(fmtDate(t.due_date)) + "</span>");
     const mod = (doneOn || t.status === "done") ? " is-done" : due.cls ? " is-" + due.cls : "";
     return '<button type="button" class="task-card' + mod + '" data-task="' + t.id + '">' +
@@ -815,6 +818,7 @@
     fillSelect($("tf-assignee"), sortedRoles().map((r) => ({ id: r.id, name: roleLabel(r) })),
       t ? t.role_id : "", "Unassigned");
     fillSelect($("tf-vendor"), S.vendors, t ? t.vendor_id : "", "None");
+    fillSelect($("tf-account"), S.accounts, t ? t.account_id : "", "None");
     $("tf-status").value = t && !isActive(t) ? t.status : "open";
     $("tf-delete").hidden = !t;
     taskLinkEditor.reset(t ? linksFor("task", t.id) : []);
@@ -848,6 +852,7 @@
       recurrence: $("tf-recurrence").value,
       role_id: $("tf-assignee").value || null,
       vendor_id: $("tf-vendor").value || null,
+      account_id: $("tf-account").value || null,
       status: $("tf-status").value,
       completed_at: nowDone ? (existing && existing.completed_at) || new Date().toISOString() : null,
     };
@@ -1094,6 +1099,7 @@
       await getStore().remove("accounts", id);
       S.accounts = S.accounts.filter((a) => a.id !== id);
       S.links = S.links.filter((l) => l.account_id !== id);
+      S.tasks.forEach((t) => { if (t.account_id === id) t.account_id = null; });
       closeModal("account-modal");
       toast("Deleted.");
       renderAll();

@@ -80,6 +80,11 @@ an email. `contactsFor()` lists the primary first. The email shows a
 vendor's primary contact through `primaryContact()`, falling back to the old
 columns for a vendor with no contacts.
 
+A responsibility can also point at the account or city portal it is done
+through, with `responsibilities.account_id`, chosen in its dialog next to
+Status. Deleting an account clears it. The email shows it under the
+responsibility with a link to the account on the site and to the portal.
+
 `accounts` has no password column and must not get one. The database is
 readable by anyone with the site address, so credentials live in the board
 password manager. The same reasoning excluded the camera stream host, port
