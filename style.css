@@ -470,6 +470,14 @@ textarea.input { min-height: 80px; }
 .doc-grip:active { cursor: grabbing; }
 .doc-fields { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; flex: 1; min-width: 0; }
 .slot-fields { grid-template-columns: 1.2fr 1fr .9fr .9fr; }
+.contact-fields { grid-template-columns: 1fr 1.2fr 1fr; }
+.contact-row { flex-wrap: wrap; }
+.contact-row .doc-fields { flex: 1 1 100%; }
+.contact-row .doc-buttons { align-items: center; justify-content: space-between; width: 100%; }
+.contact-primary { padding: 6px 8px; font-size: 15px; }
+.contact-person { font-size: 15px; color: var(--text-soft); margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.contact-person .lbl { font-weight: 600; color: var(--text); }
+.contact-person a { color: var(--primary-dark); }
 .doc-buttons { display: flex; gap: 6px; flex: 0 0 auto; flex-wrap: wrap; }
 .doc-btn {
   border: 2px solid var(--border-strong); background: var(--surface); color: var(--text);
@@ -532,7 +540,7 @@ textarea.input { min-height: 80px; }
   .toolbar .search-field { flex: 1 1 100%; }
   .filter-bar .field { flex: 1 1 100%; }
   .doc-row { flex-wrap: wrap; }
-  .doc-fields, .slot-fields { grid-template-columns: 1fr; width: 100%; }
+  .doc-fields, .slot-fields, .contact-fields { grid-template-columns: 1fr; width: 100%; }
   .doc-buttons { width: 100%; }
   .doc-btn { flex: 1; }
   .container { padding: 20px 16px 80px; }

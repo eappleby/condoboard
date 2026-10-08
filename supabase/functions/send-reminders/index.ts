@@ -36,11 +36,26 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 export type Vendor = {
   name: string;
+  website: string | null;
+  // Retired single contact columns, read only when a vendor has no contacts.
   contact_name: string | null;
   email: string | null;
   phone: string | null;
-  website: string | null;
+  vendor_contacts?: {
+    name: string;
+    email: string | null;
+    phone: string | null;
+    is_primary: boolean;
+    position?: number | null;
+  }[] | null;
 };
+
+/** The vendor's primary contact, or the first one when none is marked. */
+function primaryContact(v: Vendor): { name: string | null; email: string | null; phone: string | null } {
+  const list = (v.vendor_contacts || []).slice().sort((a, b) =>
+    Number(b.is_primary) - Number(a.is_primary) || (a.position || 0) - (b.position || 0));
+  return list[0] || { name: v.contact_name, email: v.email, phone: v.phone };
+}
 
 export type Task = {
   id: string;
@@ -292,9 +307,10 @@ function detailedItem(t: Task, today: string, tone: ToneName): string {
   if (t.vendor) {
     const v = t.vendor;
     const bits = [escapeHtml(v.name)];
-    if (v.contact_name) bits.push(escapeHtml(v.contact_name));
-    if (v.phone) bits.push(escapeHtml(v.phone));
-    if (v.email) bits.push(`<a href="mailto:${escapeHtml(v.email)}" ${L.link}>${escapeHtml(v.email)}</a>`);
+    const c = primaryContact(v);
+    if (c.name) bits.push(escapeHtml(c.name));
+    if (c.phone) bits.push(escapeHtml(c.phone));
+    if (c.email) bits.push(`<a href="mailto:${escapeHtml(c.email)}" ${L.link}>${escapeHtml(c.email)}</a>`);
     if (v.website) bits.push(`<a href="${escapeHtml(safeUrl(v.website))}" ${L.link}>${escapeHtml(v.website.replace(/^https?:\/\//, ""))}</a>`);
     rows.push(`<p ${L.row}><span ${L.lbl}>Vendor:</span> ${bits.join(", ")}</p>`);
   }
@@ -465,7 +481,8 @@ if (import.meta.main) {
         .from("responsibilities")
         .select("id,title,description,due_date,priority,category,estimated_cost,last_completed_on," +
                 "role:board_roles(name,member:board_members(name,email))," +
-                "vendor:vendors(name,contact_name,email,phone,website)," +
+                "vendor:vendors(name,contact_name,email,phone,website," +
+                "vendor_contacts(name,email,phone,is_primary,position))," +
                 "links(title,url,sort_order)")
         // Active only. in_progress is a retired value that still counts as
         // active until the status migration has run.

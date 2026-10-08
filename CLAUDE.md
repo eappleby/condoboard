@@ -49,7 +49,8 @@ replies in chat:
 
 ## Data model
 
-Tables: `board_members`, `board_roles`, `vendors`, `responsibilities`,
+Tables: `board_members`, `board_roles`, `vendors`, `vendor_contacts`,
+`responsibilities`,
 `links`, `accounts`, `reminder_settings`, `schedules`, `schedule_slots`,
 `fixtures`. A link belongs
 to exactly one of a responsibility, a vendor, an account, or a fixture, and
@@ -67,6 +68,16 @@ changes, only the role holder is edited. `responsibilities.assignee_id` and
 read or write them. `rolesOf()` and `tasksOfMember()` resolve a person to
 their responsibilities, and the email function joins
 `role:board_roles(name,member:board_members(name,email))`.
+
+A vendor's people live in `vendor_contacts`: name, email, optional phone,
+`is_primary` and `position`. `vendors.contact_name`, `vendors.email` and
+`vendors.phone` are dead columns kept for compatibility. `contactEditor`
+in the vendor modal keeps exactly one primary while any contact exists,
+drops rows with no name, and `saveContacts()` writes them. Only the name is
+enforced, because the rows carried over from the old columns do not all have
+an email. `contactsFor()` lists the primary first. The email shows a
+vendor's primary contact through `primaryContact()`, falling back to the old
+columns for a vendor with no contacts.
 
 `accounts` has no password column and must not get one. The database is
 readable by anyone with the site address, so credentials live in the board

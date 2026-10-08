@@ -48,9 +48,9 @@ sample data and nothing is saved.
 * **Recurring duties.** Mark a repeating item done and it stays active. Today
   is recorded as the last time it was done and the due date moves to the
   next cycle. Intervals run from monthly through every five years.
-* **Vendors.** Contact details, contract cost and period, notes, and attached
-  documents. Split into vendors under contract and vendors that are only
-  recommended so far.
+* **Vendors.** A list of contacts with one marked primary, contract cost
+  and period, notes, and attached documents. Split into vendors under
+  contract and vendors that are only recommended so far.
 * **Accounts.** Utility accounts and city portals with account numbers,
   usernames, and links. There is no password field, on purpose.
 * **Board.** Roles and members. A responsibility is assigned to a role such

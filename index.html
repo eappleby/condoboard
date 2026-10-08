@@ -365,10 +365,6 @@
               <option value="past">No longer used</option>
             </select>
           </label>
-          <label class="field">
-            <span>Contact person</span>
-            <input class="input" id="vf-contact">
-          </label>
         </div>
         <div class="field-row">
           <label class="field">
@@ -380,16 +376,6 @@
             <input class="input" id="vf-costperiod" placeholder="monthly, annual, 3-year">
           </label>
         </div>
-        <div class="field-row">
-          <label class="field">
-            <span>Phone</span>
-            <input class="input" id="vf-phone" type="tel">
-          </label>
-          <label class="field">
-            <span>Email</span>
-            <input class="input" id="vf-email" type="email">
-          </label>
-        </div>
         <label class="field">
           <span>Website</span>
           <input class="input" id="vf-website" placeholder="https://">
@@ -398,6 +384,11 @@
           <span>Notes</span>
           <textarea class="input" id="vf-notes" rows="3"></textarea>
         </label>
+        <fieldset class="links-fieldset">
+          <legend>Contacts</legend>
+          <div id="vf-contacts"></div>
+          <button type="button" class="btn" id="vf-contact-add">Add a contact</button>
+        </fieldset>
         <fieldset class="links-fieldset">
           <legend>Documents</legend>
           <div id="vf-links"></div>

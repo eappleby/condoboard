@@ -47,8 +47,8 @@
       { id: uid(), name: "Sample Treasurer", email: "treasurer@example.com", phone: "", apartment: "2" },
     ];
     const vendors = [
-      { id: uid(), name: "Sample Cleaning Co", service: "Janitorial", contact_name: "", email: "office@example.com", phone: "(555) 010-4411", website: "", notes: "", status: "contracted", cost: 500, cost_period: "monthly" },
-      { id: uid(), name: "Sample Electric", service: "Electrician", contact_name: "", email: "info@example.com", phone: "", website: "", notes: "", status: "recommended", cost: null, cost_period: null },
+      { id: uid(), name: "Sample Cleaning Co", service: "Janitorial", website: "", notes: "", status: "contracted", cost: 500, cost_period: "monthly" },
+      { id: uid(), name: "Sample Electric", service: "Electrician", website: "", notes: "", status: "recommended", cost: null, cost_period: null },
     ];
     const accounts = [
       { id: uid(), name: "Sample Water Account", category: "Utilities", account_number: "0000000000", portal_url: "https://example.com", username: "building@example.com", notes: "" },
@@ -84,7 +84,12 @@
       { id: uid(), name: "Sample Light", category: "Lighting", brand: "Sample Brand", code: null,
         location: "Hallway", url: "https://example.com", color_hex: null, notes: "", position: 1 },
     ];
-    return { members, roles, vendors, tasks, links, accounts, settings, schedules, scheduleSlots, fixtures };
+    const contacts = [
+      { id: uid(), vendor_id: vendors[0].id, name: "Sample Manager", email: "office@example.com", phone: "(555) 010-4411", is_primary: true, position: 0 },
+      { id: uid(), vendor_id: vendors[0].id, name: "Sample Billing", email: "billing@example.com", phone: null, is_primary: false, position: 1 },
+      { id: uid(), vendor_id: vendors[1].id, name: "Sample Electrician", email: "info@example.com", phone: null, is_primary: true, position: 0 },
+    ];
+    return { members, roles, vendors, contacts, tasks, links, accounts, settings, schedules, scheduleSlots, fixtures };
   }
 
   const TABLE = {
@@ -92,6 +97,7 @@
     tasks: "responsibilities", links: "links", accounts: "accounts",
     settings: "reminder_settings",
     schedules: "schedules", scheduleSlots: "schedule_slots", fixtures: "fixtures",
+    contacts: "vendor_contacts",
   };
 
   function makeDemoStore() {
@@ -118,7 +124,7 @@
     }
     return {
       async load() {
-        const [members, vendors, tasks, links, accounts, settings, schedules, scheduleSlots, fixtures, roles] = await Promise.all([
+        const [members, vendors, tasks, links, accounts, settings, schedules, scheduleSlots, fixtures, roles, contacts] = await Promise.all([
           q(client.from(TABLE.members).select("*").order("name")),
           q(client.from(TABLE.vendors).select("*").order("name")),
           q(client.from(TABLE.tasks).select("*").order("due_date", { ascending: true, nullsFirst: false })),
@@ -131,9 +137,10 @@
           q(client.from(TABLE.scheduleSlots).select("*").order("position")).catch(() => []),
           q(client.from(TABLE.fixtures).select("*").order("position")).catch(() => []),
           q(client.from(TABLE.roles).select("*").order("position")).catch(() => []),
+          q(client.from(TABLE.contacts).select("*").order("position")).catch(() => []),
         ]);
         return {
-          members, roles, vendors, tasks, links, accounts,
+          members, roles, vendors, contacts, tasks, links, accounts,
           settings: settings[0] || null, schedules, scheduleSlots, fixtures,
         };
       },
@@ -159,7 +166,7 @@
   // ------------------------------------------------------------------
   // State and helpers
   // ------------------------------------------------------------------
-  let S = { members: [], roles: [], vendors: [], tasks: [], links: [], accounts: [],
+  let S = { members: [], roles: [], vendors: [], contacts: [], tasks: [], links: [], accounts: [],
     settings: null, schedules: [], scheduleSlots: [], fixtures: [] };
   const $ = (id) => document.getElementById(id);
 
@@ -487,11 +494,20 @@
     "intercom": "blue", "appliances": "green" };
   function toneFor(map, key) { return map[String(key || "").trim().toLowerCase()] || "blue"; }
 
+  // A vendor's contacts, the primary one first.
+  function contactsFor(vendorId) {
+    return S.contacts.filter((c) => c.vendor_id === vendorId).sort((a, b) =>
+      (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0) || (a.position || 0) - (b.position || 0));
+  }
+
   function vendorCard(v) {
     const lines = [];
-    if (v.contact_name) lines.push('<div class="contact-line"><span class="lbl">Contact:</span> ' + esc(v.contact_name) + "</div>");
-    if (v.phone) lines.push('<div class="contact-line"><span class="lbl">Phone:</span> <a href="tel:' + esc(v.phone) + '" onclick="event.stopPropagation()">' + esc(v.phone) + "</a></div>");
-    if (v.email) lines.push('<div class="contact-line"><span class="lbl">Email:</span> <a href="mailto:' + esc(v.email) + '" onclick="event.stopPropagation()">' + esc(v.email) + "</a></div>");
+    const people = contactsFor(v.id).map((c) =>
+      '<div class="contact-person"><span class="lbl">' + esc(c.name) + "</span>" +
+      (c.is_primary ? ' <span class="badge badge-open">Primary</span>' : "") +
+      (c.email ? '<a href="mailto:' + esc(c.email) + '" onclick="event.stopPropagation()">' + esc(c.email) + "</a>" : "") +
+      (c.phone ? '<a href="tel:' + esc(c.phone) + '" onclick="event.stopPropagation()">' + esc(c.phone) + "</a>" : "") +
+      "</div>").join("");
     if (v.website) lines.push('<div class="contact-line"><span class="lbl">Website:</span> <a href="' + esc(safeUrl(v.website)) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + esc(v.website.replace(/^https?:\/\//, "")) + "</a></div>");
     if (v.cost != null) {
       lines.push('<div class="contact-line"><span class="lbl">Cost:</span> ' + esc(fmtMoney(v.cost)) +
@@ -501,7 +517,7 @@
     return '<button type="button" class="info-card tone-' + tone + '" data-vendor="' + v.id + '">' +
       "<h3>" + esc(v.name) + "</h3>" +
       '<div class="sub">' + esc(v.service || VENDOR_STATUS_LABEL[v.status] || "") + "</div>" +
-      lines.join("") +
+      people + lines.join("") +
       (v.notes ? '<div class="notes">' + esc(v.notes) + "</div>" : "") +
       linkChips(linksFor("vendor", v.id)) + "</button>";
   }
@@ -865,6 +881,97 @@
     } catch (e) { fail(e); }
   });
 
+  // ---------------- vendor contacts ----------------
+  // Rows of name, email and phone, with one marked primary. There is always
+  // exactly one primary while any contact exists.
+  const contactEditor = (function () {
+    let draft = [];
+    let removed = [];
+
+    function fixPrimary() {
+      if (draft.length && !draft.some((c) => c.is_primary)) draft[0].is_primary = true;
+    }
+    function render() {
+      const el = $("vf-contacts");
+      if (!draft.length) { el.innerHTML = '<p class="link-none">Nothing added yet.</p>'; return; }
+      el.innerHTML = draft.map((c, i) =>
+        '<div class="doc-row contact-row">' +
+          '<div class="doc-fields contact-fields">' +
+            '<label class="field"><span class="visually-hidden">Name</span>' +
+              '<input class="input" data-f="name" data-i="' + i + '" placeholder="Name" value="' + esc(c.name || "") + '"></label>' +
+            '<label class="field"><span class="visually-hidden">Email</span>' +
+              '<input class="input" type="email" data-f="email" data-i="' + i + '" placeholder="Email" value="' + esc(c.email || "") + '"></label>' +
+            '<label class="field"><span class="visually-hidden">Phone, optional</span>' +
+              '<input class="input" type="tel" data-f="phone" data-i="' + i + '" placeholder="Phone (optional)" value="' + esc(c.phone || "") + '"></label>' +
+          "</div>" +
+          '<div class="doc-buttons">' +
+            '<label class="radio-row contact-primary"><input type="radio" name="vf-primary" data-primary="' + i + '"' +
+              (c.is_primary ? " checked" : "") + "><span>Primary</span></label>" +
+            '<button type="button" class="doc-btn doc-rm" data-rm="' + i + '" aria-label="Remove contact">Remove</button>' +
+          "</div></div>").join("");
+      el.querySelectorAll("input[data-f]").forEach((input) =>
+        input.addEventListener("input", () => {
+          draft[Number(input.dataset.i)][input.dataset.f] = input.value;
+        }));
+      el.querySelectorAll("[data-primary]").forEach((r) =>
+        r.addEventListener("change", () => {
+          draft.forEach((c, i) => { c.is_primary = i === Number(r.dataset.primary); });
+        }));
+      el.querySelectorAll("[data-rm]").forEach((b) =>
+        b.addEventListener("click", () => {
+          const i = Number(b.dataset.rm);
+          if (draft[i].id) removed.push(draft[i].id);
+          draft.splice(i, 1);
+          fixPrimary();
+          render();
+        }));
+    }
+    $("vf-contact-add").addEventListener("click", () => {
+      draft.push({ name: "", email: "", phone: "", is_primary: false });
+      fixPrimary();
+      render();
+      const inputs = $("vf-contacts").querySelectorAll('input[data-f="name"]');
+      inputs[inputs.length - 1].focus();
+    });
+    return {
+      reset(existing) {
+        draft = existing.map((c) => ({ id: c.id, name: c.name, email: c.email, phone: c.phone, is_primary: !!c.is_primary }));
+        removed = [];
+        fixPrimary();
+        render();
+      },
+      // Rows with no name are dropped, and the primary mark moves if its row went.
+      rows() {
+        const kept = draft.filter((c) => (c.name || "").trim());
+        if (kept.length && !kept.some((c) => c.is_primary)) kept[0].is_primary = true;
+        return kept;
+      },
+      removed: () => removed,
+    };
+  })();
+
+  async function saveContacts(vendorId) {
+    for (const id of contactEditor.removed()) {
+      await getStore().remove("contacts", id);
+      S.contacts = S.contacts.filter((c) => c.id !== id);
+    }
+    const rows = contactEditor.rows();
+    for (let i = 0; i < rows.length; i++) {
+      const c = rows[i];
+      const patch = {
+        name: c.name.trim(), email: (c.email || "").trim() || null,
+        phone: (c.phone || "").trim() || null, is_primary: !!c.is_primary, position: i,
+      };
+      if (c.id) {
+        const existing = S.contacts.find((x) => x.id === c.id);
+        await getStore().update("contacts", c.id, patch);
+        if (existing) Object.assign(existing, patch);
+      } else {
+        S.contacts.push(await getStore().insert("contacts", Object.assign({ vendor_id: vendorId }, patch)));
+      }
+    }
+  }
+
   // ---------------- vendor modal ----------------
   function openVendorModal(v) {
     $("vendor-modal-title").textContent = v ? "Edit vendor" : "Add vendor";
@@ -872,15 +979,13 @@
     $("vf-name").value = v ? v.name : "";
     $("vf-service").value = v ? (v.service || "") : "";
     $("vf-status").value = v ? (v.status || "contracted") : "contracted";
-    $("vf-contact").value = v ? (v.contact_name || "") : "";
     $("vf-cost").value = v && v.cost != null ? v.cost : "";
     $("vf-costperiod").value = v ? (v.cost_period || "") : "";
-    $("vf-phone").value = v ? (v.phone || "") : "";
-    $("vf-email").value = v ? (v.email || "") : "";
     $("vf-website").value = v ? (v.website || "") : "";
     $("vf-notes").value = v ? (v.notes || "") : "";
     $("vf-delete").hidden = !v;
     vendorLinkEditor.reset(v ? linksFor("vendor", v.id) : []);
+    contactEditor.reset(v ? contactsFor(v.id) : []);
     openModal("vendor-modal");
     $("vf-name").focus();
   }
@@ -893,11 +998,8 @@
       name: $("vf-name").value.trim(),
       service: $("vf-service").value.trim() || null,
       status: $("vf-status").value,
-      contact_name: $("vf-contact").value.trim() || null,
       cost: costVal === "" ? null : Number(costVal),
       cost_period: $("vf-costperiod").value.trim() || null,
-      phone: $("vf-phone").value.trim() || null,
-      email: $("vf-email").value.trim() || null,
       website: $("vf-website").value.trim() || null,
       notes: $("vf-notes").value.trim() || null,
     };
@@ -913,6 +1015,7 @@
         S.vendors.push(saved);
       }
       await saveLinks(vendorLinkEditor, "vendor_id", saved.id);
+      await saveContacts(saved.id);
       closeModal("vendor-modal");
       toast("Saved.");
       renderAll();
@@ -926,6 +1029,7 @@
       await getStore().remove("vendors", id);
       S.vendors = S.vendors.filter((v) => v.id !== id);
       S.links = S.links.filter((l) => l.vendor_id !== id);
+      S.contacts = S.contacts.filter((c) => c.vendor_id !== id);
       S.tasks.forEach((t) => { if (t.vendor_id === id) t.vendor_id = null; });
       closeModal("vendor-modal");
       toast("Deleted.");
@@ -1695,6 +1799,7 @@
       S = await getStore().load();
       S.accounts = S.accounts || [];
       S.roles = S.roles || [];
+      S.contacts = S.contacts || [];
       S.settings = Object.assign({}, DEFAULT_SETTINGS, S.settings || {});
       S.schedules = S.schedules || [];
       S.scheduleSlots = S.scheduleSlots || [];
