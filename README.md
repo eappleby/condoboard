@@ -56,9 +56,8 @@ sample data and nothing is saved.
 * **Board.** Roles and members. A responsibility is assigned to a role such
   as Treasurer, and a role is held by a member, so a change of board only
   means changing who holds each role. A member's picture comes from Gravatar
-  when their email has one, and is otherwise the first letter of their name. Each member tile opens that
-  person's details, and its responsibilities count opens the list filtered
-  to them.
+  when their email has one, and is otherwise the first letter of their name. Member tiles show each
+  person's email and phone and open their details.
 * **Fixtures.** What the building uses and what to buy when something is
   replaced: paint colours with swatches, light fittings, hardware, the
   intercom, appliances. Each one can carry a picture, uploaded or linked,

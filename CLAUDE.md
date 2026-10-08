@@ -264,13 +264,14 @@ swatch, name, brand and number. Do not add lines back. Since document chips
 are no longer on cards, each saved row in the document editor has an Open
 link.
 
-The Board tab has a Roles grid and a Members grid. Role cards open the role
-modal. A member tile is a `div`, not a button, because it holds two targets:
-the name is a button whose hit area is stretched over the whole tile and
-opens the member, and the responsibilities count is a link above it that
-opens the Responsibilities tab filtered to that person. The person filter
-goes by member through `memberOfTask()`, not by role, and Unassigned covers
-vacant roles too.
+The Board tab has a Roles grid and a Members grid. A role card is the role
+and its holder, and opens the role modal. A member tile is the picture,
+name, apartment, email and phone, with no role and no count. It is a `div`,
+not a button, because the email and phone are links: the name is a button
+whose hit area is stretched over the whole tile and opens the member, and
+the links sit above it. The Responsibilities person filter goes by member
+through `memberOfTask()`, not by role, and Unassigned covers vacant roles
+too.
 
 ## Colour
 

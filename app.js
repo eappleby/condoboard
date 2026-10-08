@@ -558,27 +558,21 @@
   function renderMembers() {
     $("role-grid").innerHTML = sortedRoles().map((r) => {
       const m = memberById(r.member_id);
-      const count = S.tasks.filter((t) => t.role_id === r.id && isActive(t)).length;
       return '<button type="button" class="info-card tone-purple" data-role="' + r.id + '">' +
         "<h3>" + esc(r.name) + "</h3>" +
-        '<div class="sub">' + esc(m ? m.name : "Vacant") + "</div>" +
-        '<div class="contact-line"><span class="lbl">Responsibilities:</span> ' + count + "</div></button>";
+        '<div class="sub">' + esc(m ? m.name : "Vacant") + "</div></button>";
     }).join("") || '<p class="none">No roles yet.</p>';
 
     // The whole tile opens the member through the name button, whose hit area
-    // is stretched over the card. The count sits above it as its own link.
-    $("member-grid").innerHTML = S.members.map((m) => {
-      const count = tasksOfMember(m.id).length;
-      const sub = [rolesOf(m.id).map((r) => r.name).join(", ") || "No role"];
-      if (m.apartment) sub.push("Apartment " + m.apartment);
-      return '<div class="info-card card-stretch tone-blue">' +
+    // is stretched over the card. The email and phone links sit above it.
+    $("member-grid").innerHTML = S.members.map((m) =>
+      '<div class="info-card card-stretch tone-blue">' +
         '<div class="member-head">' + avatar(m, "avatar-lg") +
         '<div><h3><button type="button" class="card-open" data-member="' + m.id + '">' + esc(m.name) + "</button></h3>" +
-        '<div class="sub">' + esc(sub.join(", ")) + "</div></div></div>" +
-        '<div class="contact-line"><span class="lbl">Responsibilities:</span> ' +
-          '<a href="#" class="count-link" data-member-tasks="' + m.id + '" aria-label="' + count +
-          " responsibilities for " + esc(m.name) + '">' + count + "</a></div></div>";
-    }).join("");
+        (m.apartment ? '<div class="sub">Apartment ' + esc(m.apartment) + "</div>" : "") + "</div></div>" +
+        (m.email ? '<div class="contact-line"><a href="mailto:' + esc(m.email) + '">' + esc(m.email) + "</a></div>" : "") +
+        (m.phone ? '<div class="contact-line"><a href="tel:' + esc(m.phone) + '">' + esc(m.phone) + "</a></div>" : "") +
+        "</div>").join("");
     $("member-empty").hidden = S.members.length > 0;
   }
 
@@ -1733,22 +1727,6 @@
       e.stopPropagation();
       const t = S.tasks.find((x) => x.id === doneBtn.dataset.done);
       if (t) completeTask(t);
-      return;
-    }
-    // The count on a member tile opens the Responsibilities tab on that person.
-    const mt = e.target.closest("[data-member-tasks]");
-    if (mt) {
-      e.preventDefault();
-      $("filter-status").value = "open";
-      $("filter-category").value = "";
-      $("filter-assignee").value = mt.dataset.memberTasks;
-      $("task-search").value = "";
-      $("filter-panel").hidden = false;
-      $("filter-toggle").setAttribute("aria-expanded", "true");
-      renderTaskTable();
-      showView("tasks");
-      window.scrollTo(0, 0);
-      $("filter-assignee").focus();
       return;
     }
     if (e.target.closest("a")) return;
