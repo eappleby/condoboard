@@ -84,8 +84,7 @@ A responsibility can also point at the account or city portal it is done
 through, with `responsibilities.account_id`, chosen in its dialog next to
 Status. On the Responsibilities table, `refLinks()` names the vendor and
 account under the title as `#vendor/<id>` and `#account/<id>` links, which
-`route()` turns into that record's dialog. Deleting an account clears it. The email shows it under the
-responsibility with a link to the account on the site and to the portal.
+`route()` turns into that record's dialog. Deleting an account clears it.
 
 `accounts` has no password column and must not get one. The database is
 readable by anyone with the site address, so credentials live in the board
@@ -139,9 +138,12 @@ Structure: a header with the logo, the name and three counters, then a
 Schedules table naming who is up for each rotation in the month ahead and
 the month after, such as the apartment on trash, then one
 table listing everything overdue, due in the month ahead and due in the
-month after, then overdue in full and the month ahead in full. The month
-after appears only in the table. Empty sections are left out, and there is
-no footer, by Evan's choice.
+month after, then "Coming up later", the `LATER_MONTHS` (six) months after
+that, as name, person and date. There are no detail cards: Evan found them
+a repeat of the table, so the email stays a set of short lists and the
+details live on the site, one click away. Empty sections are left out, and
+there is no footer, by Evan's choice. The query only selects what those
+lists show, so adding a detail back means adding it to the select too.
 
 Everything in the email that names something on the site links to it,
 through `a(path, inner)` and `href(path)`, which build `APP_URL/#path` and
@@ -171,7 +173,8 @@ The Schedules table comes from `schedules` and `schedule_slots`, passed to
 either month is left out, and a failed schedules query does not stop the
 email.
 
-`coveredMonths()` decides which months those are. On or before
+`coveredMonths()` decides which months those are, and `laterEnd` for the
+later list. On or before
 the 20th the detailed month is the current one, from the 21st it rolls to the
 next. It handles the year boundary. If that rule changes, change the wording
 on the Notifications tab and in README.md too, since both explain it.
@@ -376,6 +379,10 @@ marks whoever is up this month. It handles ranges that wrap past December.
   from today when there was no date. Both paths call `rollForward()`. Rows
   that are done and repeating are leftovers from the older behaviour, which
   inserted a new row each time.
+* The dashboard's Expected annual cost counter annualizes repeating items
+  (cost times 12 over the cycle in months) and adds one time items that are
+  overdue or due within a year. Ongoing items and undated one time items
+  are left out, since nothing says how often they cost.
 * The dashboard's Recently completed list therefore also shows open
   repeating items by `last_completed_on`.
 * Recurrence values are none, ongoing, monthly, quarterly, semiannual,

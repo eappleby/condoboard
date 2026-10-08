@@ -375,15 +375,27 @@
         : isActive(t) && isRecurring(t) ? t.last_completed_on : null,
     })).filter((x) => x.on).sort((a, b) => b.on.localeCompare(a.on)).slice(0, 6);
 
-    const upcomingCost = open.reduce((sum, t) => sum + (Number(t.estimated_cost) || 0), 0);
+    // Expected cost over the next twelve months. A repeating item counts as
+    // many times as it comes round in a year, so a monthly $100 is $1,200.
+    // A one time item counts if it is overdue or due within the year.
+    // Ongoing items and one time items with no date have no cadence to go
+    // on, so they are left out.
+    const yearOut = ymd(new Date(new Date().setFullYear(new Date().getFullYear() + 1)));
+    const annualCost = open.reduce((sum, t) => {
+      const cost = Number(t.estimated_cost) || 0;
+      if (!cost) return sum;
+      if (isRecurring(t)) return sum + cost * 12 / RECUR_MONTHS[t.recurrence];
+      if (!isOngoing(t) && t.due_date && t.due_date <= yearOut) return sum + cost;
+      return sum;
+    }, 0);
     $("stats").innerHTML =
       '<div class="stat stat-red"><div class="num">' + overdue.length + '</div><div class="lbl">Overdue</div></div>' +
       '<div class="stat stat-amber"><div class="num">' + soon.length + '</div><div class="lbl">Due in 30 days</div></div>' +
       '<div class="stat stat-blue"><div class="num">' + open.length + '</div><div class="lbl">Active responsibilities</div></div>' +
       '<div class="stat stat-green"><div class="num">' + S.vendors.filter((v) => v.status !== "past").length +
         '</div><div class="lbl">Vendors on file</div></div>' +
-      '<div class="stat stat-blue"><div class="num">' + esc(fmtMoney(upcomingCost) || "$0") +
-        '</div><div class="lbl">Estimated cost of active work</div></div>';
+      '<div class="stat stat-blue"><div class="num">' + esc(fmtMoney(Math.round(annualCost)) || "$0") +
+        '</div><div class="lbl">Expected annual cost</div></div>';
 
     renderList("list-overdue", overdue, "Nothing is overdue.");
     renderList("list-soon", soon, "Nothing is due in the next 30 days.");

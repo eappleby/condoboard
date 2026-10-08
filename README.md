@@ -38,7 +38,9 @@ sample data and nothing is saved.
 
 * **Dashboard.** Overdue, due in the next 30 days, coming up later,
   recently completed, and anything with no date set. Five counters
-  across the top, including the estimated cost of all active work.
+  across the top, including the expected annual cost: each repeating item
+  counted as often as it comes round in a year, plus one time items that are
+  overdue or due within the year.
 * **Responsibilities.** A searchable list, with status, category and person
   filters behind the Filter button, sortable by any column heading. Each item carries a category, priority,
   due date, the date it was last done, an estimated cost, a board role, an
@@ -71,11 +73,10 @@ sample data and nothing is saved.
 * **Notifications.** Monthly or Never, the day it goes out, and a preview.
 * **Monthly summary email.** Off until you switch it on. It opens with the
   logo and three counters, then who is up for each schedule such as the
-  apartment on trash, then a table of everything overdue, due in the
-  month ahead and due in the month after. Below that, overdue items and the
-  month ahead appear in full with who is responsible, vendor contacts,
-  documents and costs. Every responsibility, person, vendor and schedule in
-  the email links to its page on the site.
+  apartment on trash, then a table of everything overdue, due in the month
+  ahead and due in the month after, then what is coming up in the six months
+  after that. Every item links to its page on the site, where the details
+  are.
 * **Documents.** Every responsibility, vendor, account and fixture can hold a
   list of documents. Edit a label or address in place, drag rows to reorder them, or
   use the up and down buttons.

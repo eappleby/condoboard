@@ -6,14 +6,14 @@
 // reminders_enabled is false, so the cron can be scheduled well before the
 // board is ready to receive anything.
 //
-// The email has four parts:
+// The email has four parts, each a short list that links into the site,
+// where the details live:
 //   Header           logo, name, and three counters like the dashboard's
 //   Schedules        who is up for each rotation, such as the apartment on
 //                    trash, in the month ahead and the month after
-//   Table            everything overdue, due in the month ahead, and due in
+//   Upcoming         everything overdue, due in the month ahead, and due in
 //                    the month after, one row each
-//   Overdue          full detail, however far past it is
-//   The month ahead  full detail, with contacts, documents and costs
+//   Coming up later  the six months after that, one row each
 //
 // Which month counts as "ahead" depends on when it is sent. On or before the
 // 20th it is the current month, since most of it is still to come. From the
@@ -35,43 +35,11 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-export type Vendor = {
-  id?: string;
-  name: string;
-  website: string | null;
-  // Retired single contact columns, read only when a vendor has no contacts.
-  contact_name: string | null;
-  email: string | null;
-  phone: string | null;
-  vendor_contacts?: {
-    name: string;
-    email: string | null;
-    phone: string | null;
-    is_primary: boolean;
-    position?: number | null;
-  }[] | null;
-};
-
-/** The vendor's primary contact, or the first one when none is marked. */
-function primaryContact(v: Vendor): { name: string | null; email: string | null; phone: string | null } {
-  const list = (v.vendor_contacts || []).slice().sort((a, b) =>
-    Number(b.is_primary) - Number(a.is_primary) || (a.position || 0) - (b.position || 0));
-  return list[0] || { name: v.contact_name, email: v.email, phone: v.phone };
-}
-
 export type Task = {
   id: string;
   title: string;
-  description: string | null;
   due_date: string;
-  priority: string;
-  category: string;
-  estimated_cost: number | null;
-  last_completed_on: string | null;
   role: { name: string; member: { id?: string; name: string; email: string | null } | null } | null;
-  vendor: Vendor | null;
-  account?: { id: string; name: string; portal_url: string | null } | null;
-  links: { title: string | null; url: string; sort_order: number | null }[] | null;
 };
 
 /** A rotation from the Schedules tab, such as trash and recycling. */
@@ -119,11 +87,6 @@ export function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function safeUrl(u: string): string {
-  const s = String(u || "").trim();
-  return /^https?:\/\//i.test(s) ? s : "https://" + s;
-}
-
 export function isSendDay(s: Settings, now: Date): boolean {
   const weekday = now.getUTCDay();
   switch (s.frequency) {
@@ -153,31 +116,30 @@ export function describeSchedule(s: Settings): string {
   return `Sending ${who}, ${when}.`;
 }
 
+/** How many months past the month after the "Coming up later" list reaches. */
+const LATER_MONTHS = 6;
+
 /**
  * The two months the email covers. Sent on or before the 20th, the detailed
  * month is the current one. From the 21st it rolls to the next month.
  */
-export function coveredMonths(now: Date): { aheadStart: Date; aheadEnd: Date; afterEnd: Date; aheadName: string; afterName: string } {
+export function coveredMonths(now: Date): { aheadStart: Date; aheadEnd: Date; afterEnd: Date; laterEnd: Date; aheadName: string; afterName: string } {
   const y = now.getUTCFullYear();
   const m = now.getUTCMonth();
   const roll = now.getUTCDate() >= 21 ? 1 : 0;
   const aheadStart = new Date(Date.UTC(y, m + roll, 1));
   const aheadEnd = new Date(Date.UTC(y, m + roll + 1, 0));      // last day of that month
   const afterEnd = new Date(Date.UTC(y, m + roll + 2, 0));      // last day of the month after
+  const laterEnd = new Date(Date.UTC(y, m + roll + 2 + LATER_MONTHS, 0)); // end of "coming up later"
   const nameOf = (d: Date) => `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
   return {
-    aheadStart, aheadEnd, afterEnd,
+    aheadStart, aheadEnd, afterEnd, laterEnd,
     aheadName: nameOf(aheadStart),
     afterName: nameOf(new Date(Date.UTC(aheadEnd.getUTCFullYear(), aheadEnd.getUTCMonth() + 1, 1))),
   };
 }
 
 function iso(d: Date): string { return d.toISOString().slice(0, 10); }
-
-function money(n: number | null): string {
-  if (n == null) return "";
-  return "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 function shortDate(s: string): string {
   const d = new Date(s + "T00:00:00Z");
@@ -187,14 +149,6 @@ function shortDate(s: string): string {
 function prettyDate(s: string): string {
   const d = new Date(s + "T00:00:00Z");
   return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
-}
-
-function overdueLabel(due: string, today: string): string {
-  const days = Math.round((new Date(today).getTime() - new Date(due).getTime()) / 86400000);
-  const years = Math.floor(days / 365);
-  return years >= 1
-    ? `overdue by ${years} ${years === 1 ? "year" : "years"}`
-    : `overdue by ${days} ${days === 1 ? "day" : "days"}`;
 }
 
 // Colours match the site, so the email reads as part of the same tracker:
@@ -210,8 +164,6 @@ type ToneName = keyof typeof TONE;
 
 const L = {
   row: 'style="margin:4px 0;color:#47576a;font-size:15px;line-height:1.5"',
-  lbl: 'style="color:#16202b;font-weight:bold"',
-  link: 'style="color:#16389f"',
 };
 
 // Everything in the email that names something on the site links to it.
@@ -247,14 +199,6 @@ function statTile(n: number, label: string, tone: ToneName, path: string): strin
     `<div style="font-size:28px;font-weight:bold;line-height:1.15;color:${c.fg}">${n}</div>` +
     `<div style="font-size:14px;color:#47576a;margin-top:2px">${escapeHtml(label)}</div>` +
     `</td></tr></table></a></td>`;
-}
-
-/** A section heading in the style of the dashboard's status labels. */
-function sectionHead(text: string, tone: ToneName, path: string): string {
-  const c = TONE[tone];
-  return `<p style="margin:28px 0 12px"><a href="${href(path)}" style="display:inline-block;background:${c.bg};color:${c.fg};` +
-    `border:1px solid ${c.line};border-radius:6px;padding:5px 12px;font-size:14px;font-weight:bold;text-decoration:none;` +
-    `text-transform:uppercase;letter-spacing:.05em">${escapeHtml(text)}</a></p>`;
 }
 
 /** Whoever is up for a schedule in a given month, 1 to 12. Same rule as the site. */
@@ -305,52 +249,14 @@ function tableRow(t: Task, tone: ToneName, label: string, last: boolean): string
     `<td align="right" style="${cell}">${pill(label, tone)}</td></tr>`;
 }
 
-/** One responsibility, in full, with everything needed to act on it. */
-function detailedItem(t: Task, today: string, tone: ToneName): string {
-  const rows: string[] = [];
-  const when = t.due_date < today
-    ? `${prettyDate(t.due_date)}, ${overdueLabel(t.due_date, today)}`
-    : prettyDate(t.due_date);
-  rows.push(`<p ${L.row}><span ${L.lbl}>Due:</span> <span style="color:${TONE[tone].fg};font-weight:bold">${escapeHtml(when)}</span></p>`);
-  rows.push(`<p ${L.row}><span ${L.lbl}>Responsible:</span> ${responsibleHtml(t, "Nobody assigned yet")}` +
-    (t.role?.member?.email ? ` (${escapeHtml(t.role.member.email)})` : "") + "</p>");
-  if (t.estimated_cost != null) {
-    rows.push(`<p ${L.row}><span ${L.lbl}>Estimated cost:</span> ${escapeHtml(money(t.estimated_cost))}</p>`);
-  }
-  if (t.last_completed_on) {
-    rows.push(`<p ${L.row}><span ${L.lbl}>Last done:</span> ${escapeHtml(prettyDate(t.last_completed_on))}</p>`);
-  }
-  if (t.account) {
-    const ac = t.account;
-    rows.push(`<p ${L.row}><span ${L.lbl}>Account:</span> ${a("account/" + ac.id, escapeHtml(ac.name), "text-decoration:underline")}` +
-      (ac.portal_url ? `, <a href="${escapeHtml(safeUrl(ac.portal_url))}" ${L.link}>${escapeHtml(ac.portal_url.replace(/^https?:\/\//i, "").replace(/\/.*$/, ""))}</a>` : "") + "</p>");
-  }
-  if (t.vendor) {
-    const v = t.vendor;
-    const bits = [v.id ? a("vendor/" + v.id, escapeHtml(v.name), "text-decoration:underline") : escapeHtml(v.name)];
-    const c = primaryContact(v);
-    if (c.name) bits.push(escapeHtml(c.name));
-    if (c.phone) bits.push(escapeHtml(c.phone));
-    if (c.email) bits.push(`<a href="mailto:${escapeHtml(c.email)}" ${L.link}>${escapeHtml(c.email)}</a>`);
-    if (v.website) bits.push(`<a href="${escapeHtml(safeUrl(v.website))}" ${L.link}>${escapeHtml(v.website.replace(/^https?:\/\//, ""))}</a>`);
-    rows.push(`<p ${L.row}><span ${L.lbl}>Vendor:</span> ${bits.join(", ")}</p>`);
-  }
-  const links = (t.links || []).slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-  if (links.length) {
-    const list = links.map((l) =>
-      `<a href="${escapeHtml(safeUrl(l.url))}" ${L.link}>${escapeHtml(l.title || l.url)}</a>`).join(", ");
-    rows.push(`<p ${L.row}><span ${L.lbl}>Documents:</span> ${list}</p>`);
-  }
-  if (t.description) {
-    rows.push(`<p style="margin:10px 0 0;padding-top:10px;border-top:1px solid #cfd8e3;color:#47576a;font-size:14px;line-height:1.5">${escapeHtml(t.description)}</p>`);
-  }
-  const badges = `<span style="display:inline-block;background:#eceff3;color:#3f5060;border:1px solid #cfd8e3;` +
-    `border-radius:6px;padding:3px 10px;font-size:13px;font-weight:bold">${escapeHtml(t.category || "Other")}</span>` +
-    (t.priority === "high" ? " " + pill("High priority", "overdue") : "");
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;margin:0 0 12px"><tr>` +
-    `<td style="background:#ffffff;border:1px solid #cfd8e3;border-left:6px solid ${TONE[tone].fg};border-radius:10px;padding:14px 16px">` +
-    `<p style="font-size:17px;font-weight:bold;margin:0 0 8px;color:#16202b">${a("task/" + t.id, escapeHtml(t.title))}</p>` +
-    `<p style="margin:0 0 8px">${badges}</p>` + rows.join("") + `</td></tr></table>`;
+/** One row of the "Coming up later" list: name, who, and when. */
+function laterRow(t: Task, last: boolean): string {
+  const edge = last ? "" : "border-bottom:1px solid #cfd8e3;";
+  const cell = `padding:10px;vertical-align:top;font-size:15px;line-height:1.4;${edge}`;
+  return `<tr><td style="${cell}border-left:6px solid #9fb0c4">` +
+    `<div style="font-weight:bold;color:#16202b">${a("task/" + t.id, escapeHtml(t.title))}</div>` +
+    `<div style="color:#47576a;font-size:14px;margin-top:2px">${responsibleHtml(t, "Unassigned")}</div></td>` +
+    `<td align="right" style="${cell}color:#16202b;white-space:nowrap">${escapeHtml(prettyDate(t.due_date))}</td></tr>`;
 }
 
 /**
@@ -360,9 +266,9 @@ function detailedItem(t: Task, today: string, tone: ToneName): string {
 export function buildDigest(
   tasks: Task[],
   opts: DigestOpts,
-): { html: string; subject: string; taskIds: string[]; counts: { overdue: number; ahead: number; after: number } } {
+): { html: string; subject: string; taskIds: string[]; counts: { overdue: number; ahead: number; after: number; later: number } } {
   const today = iso(opts.now);
-  const { aheadStart, aheadEnd, afterEnd, aheadName, afterName } = coveredMonths(opts.now);
+  const { aheadStart, aheadEnd, afterEnd, laterEnd, aheadName, afterName } = coveredMonths(opts.now);
   const aheadMonth = aheadName.split(" ")[0];
   const afterMonth = afterName.split(" ")[0];
 
@@ -372,6 +278,8 @@ export function buildDigest(
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
   const afterStart = new Date(Date.UTC(aheadEnd.getUTCFullYear(), aheadEnd.getUTCMonth() + 1, 1));
   const after = tasks.filter((t) => t.due_date >= iso(afterStart) && t.due_date <= iso(afterEnd))
+    .sort((a, b) => a.due_date.localeCompare(b.due_date));
+  const later = tasks.filter((t) => t.due_date > iso(afterEnd) && t.due_date <= iso(laterEnd))
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
 
   // The logo is served by the site, since mail clients do not show SVG or
@@ -410,13 +318,10 @@ export function buildDigest(
   parts.push(scheduleTable(opts.schedules || [], aheadMonth, aheadStart.getUTCMonth() + 1, afterMonth, afterNum));
   parts.push(`<h2 style="font-size:18px;margin:28px 0 12px;color:#16202b">${a("tasks", "Upcoming responsibilities")}</h2>`);
   parts.push(table);
-  if (overdue.length) {
-    parts.push(sectionHead("Overdue", "overdue", "dashboard"));
-    parts.push(overdue.map((t) => detailedItem(t, today, "overdue")).join(""));
-  }
-  if (ahead.length) {
-    parts.push(sectionHead("Due in " + aheadName, "ahead", "tasks"));
-    parts.push(ahead.map((t) => detailedItem(t, today, "ahead")).join(""));
+  if (later.length) {
+    parts.push(`<h2 style="font-size:18px;margin:28px 0 12px;color:#16202b">${a("tasks", "Coming up later")}</h2>`);
+    parts.push(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;background:#ffffff;border:1px solid #cfd8e3;border-radius:10px;overflow:hidden">` +
+      later.map((t, i) => laterRow(t, i === later.length - 1)).join("") + `</table>`);
   }
 
   const html = `<div style="background:#f4f6f9;padding:24px 12px;font-family:${FONT};font-size:16px;color:#16202b;line-height:1.5">
@@ -432,8 +337,8 @@ ${parts.join("\n")}
   return {
     html,
     subject: `372 12th board summary: ${headline}`,
-    taskIds: [...overdue, ...ahead, ...after].map((t) => t.id),
-    counts: { overdue: overdue.length, ahead: ahead.length, after: after.length },
+    taskIds: [...overdue, ...ahead, ...after, ...later].map((t) => t.id),
+    counts: { overdue: overdue.length, ahead: ahead.length, after: after.length, later: later.length },
   };
 }
 
@@ -498,20 +403,15 @@ if (import.meta.main) {
         }
       }
 
-      const { afterEnd } = coveredMonths(now);
+      const { laterEnd } = coveredMonths(now);
       const { data, error } = await supabase
         .from("responsibilities")
-        .select("id,title,description,due_date,priority,category,estimated_cost,last_completed_on," +
-                "role:board_roles(name,member:board_members(id,name,email))," +
-                "vendor:vendors(id,name,contact_name,email,phone,website," +
-                "vendor_contacts(name,email,phone,is_primary,position))," +
-                "account:accounts(id,name,portal_url)," +
-                "links(title,url,sort_order)")
+        .select("id,title,due_date,role:board_roles(name,member:board_members(id,name,email))")
         // Active only. in_progress is a retired value that still counts as
         // active until the status migration has run.
         .in("status", ["open", "in_progress"])
         .not("due_date", "is", null)
-        .lte("due_date", iso(afterEnd))
+        .lte("due_date", iso(laterEnd))
         .order("due_date");
       if (error) throw error;
       const tasks = (data ?? []) as unknown as Task[];
