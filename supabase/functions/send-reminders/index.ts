@@ -212,6 +212,13 @@ function slotFor(sc: Schedule, month: number) {
   }) || null;
 }
 
+/** The site stores a bare apartment number. The email spells it out as "Apt 5". */
+function aptLabel(v: string | null): string {
+  const t = String(v || "").trim();
+  if (!t) return "Not set";
+  return /^\d+[a-z]?$/i.test(t) ? "Apt " + t : t;
+}
+
 /** Who is scheduled for each rotation in the two months the email covers. */
 function scheduleTable(schedules: Schedule[], aheadMonth: string, aheadNum: number, afterMonth: string, afterNum: number): string {
   const rows = schedules.slice().sort((a, b) => (a.position || 0) - (b.position || 0))
@@ -222,7 +229,7 @@ function scheduleTable(schedules: Schedule[], aheadMonth: string, aheadNum: numb
   const th = `style="text-align:left;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:${g.fg};` +
     `padding:12px 10px;border-bottom:2px solid ${g.line};background:${g.bg}"`;
   const who = (s: ReturnType<typeof slotFor>) => s
-    ? `<div style="font-weight:bold;color:#16202b">${escapeHtml(s.responsible || "Not set")}</div>` +
+    ? `<div style="font-weight:bold;color:#16202b">${escapeHtml(aptLabel(s.responsible))}</div>` +
       `<div style="color:#47576a;font-size:14px;margin-top:2px">${escapeHtml(s.label)}</div>`
     : `<span style="color:#47576a">Not set</span>`;
   return `<h2 style="font-size:18px;margin:28px 0 12px;color:#16202b">${a("schedules", "Schedules")}</h2>` +

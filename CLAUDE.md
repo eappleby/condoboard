@@ -366,7 +366,8 @@ dragging only, with no up and down buttons, and removed with the x on the
 right. There is no period field: `periodLabel()` names it from the months,
 such as "January/February", and that is saved to `label` as well. The
 apartment is stored as a bare number, since "Apt" is implied, and
-`apartment()` strips the prefix from any older value. `isCurrentSlot()`
+`apartment()` strips the prefix from any older value. The email is the one place that
+writes "Apt 5", through `aptLabel()`, since it has no Apartment heading. `isCurrentSlot()`
 marks whoever is up this month. It handles ranges that wrap past December.
 
 ## Conventions and gotchas
