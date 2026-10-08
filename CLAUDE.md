@@ -167,15 +167,15 @@ email.
 `coveredMonths()` decides which months those are. On or before
 the 20th the detailed month is the current one, from the 21st it rolls to the
 next. It handles the year boundary. If that rule changes, change the wording
-on the Settings tab and in README.md too, since both explain it.
+on the Notifications tab and in README.md too, since both explain it.
 
 `days_ahead` and `cooldown_days` are dead columns. The email is month based
 now, and a monthly summary should repeat an open item rather than suppress
 it. The columns stay for compatibility but nothing reads them, and the
-Settings tab no longer offers them.
+Notifications tab no longer offers them.
 
-Behaviour is driven by the `reminder_settings` row, edited on the Settings
-tab. The function does nothing while `reminders_enabled` is false, which is
+Behaviour is driven by the `reminder_settings` row, edited on the
+Notifications tab. The function does nothing while `reminders_enabled` is false, which is
 the default, so the cron job is safe to schedule early. The cron fires daily
 and `isSendDay()` turns that into weekly or monthly. Monthly is the default.
 
@@ -193,7 +193,7 @@ sender only delivers to the Resend account owner's own address. Per person
 mode needs a verified domain, roughly $12 a year. Evan is on digest mode to
 37212th@gmail.com, which forwards to the whole board.
 
-The Settings tab is deliberately tiny: a Monthly or Never radio, the day of
+The Notifications tab is deliberately tiny: a Monthly or Never radio, the day of
 the month when Monthly is chosen, one line naming the recipient, and three
 buttons. Monthly maps to `reminders_enabled = true`, Never to false.
 `delivery_mode` and `digest_email` are no longer editable on the site and are
@@ -377,6 +377,9 @@ marks whoever is up this month. It handles ranges that wrap past December.
   column, have no done button, get their own dashboard section, and end only
   by being set to Complete or Canceled. `isRecurring()` is false for them. Adding a value means updating the check
   constraint, `RECUR_LABEL`, `RECUR_MONTHS`, and the select in `index.html`.
+* The tab that edits `reminder_settings` is labeled Notifications, with
+  `data-tab="notifications"` and `#notifications`. Its functions keep the
+  old Settings names, such as `renderSettings()`.
 * `[hidden] { display: none !important }` in style.css is what makes hiding
   work, since several classes set `display: flex`. Do not remove it.
 * All user text passes through `esc()` before reaching innerHTML, and all

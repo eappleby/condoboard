@@ -67,7 +67,7 @@ sample data and nothing is saved.
 * **Schedules.** Rotating duties such as the trash and recycling roster.
   Each row is an apartment and its months, dragged into order, and the site
   marks whose turn it is right now.
-* **Settings.** Monthly or Never, the day it goes out, and a preview.
+* **Notifications.** Monthly or Never, the day it goes out, and a preview.
 * **Monthly summary email.** Off until you switch it on. It opens with the
   logo and three counters, then who is up for each schedule such as the
   apartment on trash, then a table of everything overdue, due in the
@@ -163,10 +163,10 @@ Share that address and the password with the board.
 
 The email is off until you turn it on, so this can all be set up safely
 before the board is ready. A Supabase cron job calls the function once a day,
-and the function reads the Settings tab to decide what to do. If reminders
+and the function reads the Notifications tab to decide what to do. If reminders
 are off, it sends nothing and says so. That is why the cron stays daily even
 though the email is monthly. The daily run is only a heartbeat, and the
-Settings row decides whether it acts.
+Notifications tab decides whether it acts.
 
 Delivery is through [Resend](https://resend.com), free for 100 emails a day.
 There is a Resend rule worth knowing: the shared sender
@@ -193,7 +193,7 @@ the building address is the free path.
 3. Edit `supabase/reminders-cron.sql`, replace the project ref and anon key
    placeholders, and run it in the SQL Editor. The job fires daily at 13:00
    UTC, which is 9 AM Eastern.
-4. Open the Settings tab and press **Preview the email**. It builds the real
+4. Open the Notifications tab and press **Preview the email**. It builds the real
    email from live data and shows it exactly as it will arrive, without
    sending anything. When it looks right, choose Monthly, set the day, and
    save.
@@ -217,7 +217,7 @@ board sending near the end of the month to prepare for the next. The email
 always names the months it covers, so there is no guessing. Overdue items
 appear in full every time, however far past they are.
 
-Everything else lives on the Settings tab. The only pieces that stay as
+Everything else lives on the Notifications tab. The only pieces that stay as
 Supabase secrets are the Resend key and the sender address, because those do
 not belong in a database that anyone with the site address can read.
 

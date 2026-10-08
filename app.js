@@ -1695,7 +1695,7 @@
     callReminderFunction("force");
   });
 
-  const VIEWS = ["dashboard", "tasks", "vendors", "accounts", "board", "fixtures", "schedules", "settings"];
+  const VIEWS = ["dashboard", "tasks", "vendors", "accounts", "board", "fixtures", "schedules", "notifications"];
 
   // The tabs appear twice, once in the top bar and once in the mobile
   // sidebar, so both copies are kept in step.

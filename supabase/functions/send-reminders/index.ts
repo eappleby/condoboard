@@ -2,7 +2,7 @@
 //
 // The cron job in supabase/reminders-cron.sql calls this once a day. What it
 // actually does is decided by the reminder_settings row, which the board
-// edits on the Settings tab of the site. Nothing is ever sent while
+// edits on the Notifications tab of the site. Nothing is ever sent while
 // reminders_enabled is false, so the cron can be scheduled well before the
 // board is ready to receive anything.
 //
@@ -482,7 +482,7 @@ if (import.meta.main) {
       // look like before switching delivery on.
       if (!force && !dry) {
         if (!settings.reminders_enabled) {
-          return json({ sent: 0, skipped: "Delivery is set to Never on the Settings tab.", schedule: describeSchedule(settings) });
+          return json({ sent: 0, skipped: "Delivery is set to Never on the Notifications tab.", schedule: describeSchedule(settings) });
         }
         if (!isSendDay(settings, now)) {
           return json({ sent: 0, skipped: "Not a sending day for the chosen frequency.", schedule: describeSchedule(settings) });
@@ -539,7 +539,7 @@ if (import.meta.main) {
       const resendKey = Deno.env.get("RESEND_API_KEY");
       if (!resendKey) return json({ error: "RESEND_API_KEY is not set" }, 500);
       if (!messages.length) {
-        return json({ sent: 0, skipped: "No recipient is set on the Settings tab." });
+        return json({ sent: 0, skipped: "No recipient is set on the Notifications tab." });
       }
 
       const fromEmail = Deno.env.get("FROM_EMAIL") ?? "372 12th Board <onboarding@resend.dev>";
