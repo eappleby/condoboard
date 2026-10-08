@@ -310,6 +310,11 @@ textarea.input { min-height: 80px; }
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 12px; font-weight: 700; border: 1px solid #b7c9f2;
 }
+.avatar { position: relative; overflow: hidden; flex: 0 0 auto; }
+.avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.avatar-lg { width: 48px; height: 48px; font-size: 20px; }
+.member-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.member-head .sub { margin-bottom: 0; }
 .avatar-none { background: var(--slate-soft); color: var(--slate); border-color: var(--border); }
 
 /* ---------- filters and table ---------- */

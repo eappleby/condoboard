@@ -219,9 +219,37 @@
   }
   function vendorById(id) { return S.vendors.find((v) => v.id === id); }
   function accountById(id) { return S.accounts.find((a) => a.id === id); }
-  function initials(name) {
-    return name.split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+  // People's pictures come from Gravatar, keyed by a SHA-256 of the email.
+  // The first letter of the first name sits underneath and shows whenever
+  // there is no picture, the request fails, or hashing is unavailable.
+  const gravatar = new Map();     // email -> hash
+  const noGravatar = new Set();   // hashes that came back with no picture
+  function emailKey(m) { return String((m && m.email) || "").trim().toLowerCase(); }
+  async function hashEmails() {
+    if (!window.crypto || !crypto.subtle) return;
+    for (const m of S.members) {
+      const key = emailKey(m);
+      if (!key || gravatar.has(key)) continue;
+      try {
+        const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
+        gravatar.set(key, Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join(""));
+      } catch (e) { return; }
+    }
   }
+  function avatar(m, cls) {
+    const hash = gravatar.get(emailKey(m));
+    const img = hash && !noGravatar.has(hash)
+      ? '<img src="https://gravatar.com/avatar/' + hash + '?s=128&d=404" data-h="' + hash +
+        '" alt="" loading="lazy" referrerpolicy="no-referrer">'
+      : "";
+    return '<span class="avatar' + (cls ? " " + cls : "") + '" aria-hidden="true">' +
+      esc(String(m.name || "").trim().charAt(0).toUpperCase()) + img + "</span>";
+  }
+  // Error events do not bubble, so this listens in the capture phase.
+  document.addEventListener("error", (e) => {
+    const el = e.target;
+    if (el && el.tagName === "IMG" && el.dataset.h) { noGravatar.add(el.dataset.h); el.remove(); }
+  }, true);
   function advanceDate(dateStr, recurrence, steps) {
     const months = RECUR_MONTHS[recurrence];
     if (!months || !dateStr) return null;
@@ -271,8 +299,9 @@
     const r = roleById(t.role_id);
     if (!r) return '<span class="assignee-chip"><span class="avatar avatar-none" aria-hidden="true">NA</span>Unassigned</span>';
     const m = memberById(r.member_id);
-    return '<span class="assignee-chip"><span class="avatar' + (m ? "" : " avatar-none") + '" aria-hidden="true">' +
-      esc(initials(m ? m.name : r.name)) + '</span><span><span class="role-name">' + esc(r.name) +
+    const pic = m ? avatar(m) : '<span class="avatar avatar-none" aria-hidden="true">' +
+      esc(r.name.trim().charAt(0).toUpperCase()) + "</span>";
+    return '<span class="assignee-chip">' + pic + '<span><span class="role-name">' + esc(r.name) +
       "</span>, " + esc(m ? m.name : "vacant") + "</span></span>";
   }
 
@@ -462,8 +491,8 @@
       if (m.apartment) sub.push("Apartment " + m.apartment);
       const on = boardMemberId === m.id;
       return '<div class="info-card info-card-static tone-blue">' +
-        "<h3>" + esc(m.name) + "</h3>" +
-        '<div class="sub">' + esc(sub.join(", ")) + "</div>" +
+        '<div class="member-head">' + avatar(m, "avatar-lg") + "<div><h3>" + esc(m.name) + "</h3>" +
+        '<div class="sub">' + esc(sub.join(", ")) + "</div></div></div>" +
         (m.email ? '<div class="contact-line"><span class="lbl">Email:</span> <a href="mailto:' + esc(m.email) + '">' + esc(m.email) + "</a></div>" : "") +
         (m.phone ? '<div class="contact-line"><span class="lbl">Phone:</span> <a href="tel:' + esc(m.phone) + '">' + esc(m.phone) + "</a></div>" : "") +
         '<div class="card-actions">' +
@@ -930,6 +959,7 @@
       } else {
         S.members.push(await getStore().insert("members", row));
       }
+      await hashEmails();
       closeModal("member-modal");
       toast("Saved.");
       renderFilterOptions();
@@ -1600,6 +1630,7 @@
       S.schedules = S.schedules || [];
       S.scheduleSlots = S.scheduleSlots || [];
       S.fixtures = S.fixtures || [];
+      await hashEmails();
       renderFilterOptions();
       renderAll();
     } catch (e) {

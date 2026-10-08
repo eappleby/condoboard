@@ -53,7 +53,8 @@ sample data and nothing is saved.
   usernames, and links. There is no password field, on purpose.
 * **Board.** Roles and members. A responsibility is assigned to a role such
   as Treasurer, and a role is held by a member, so a change of board only
-  means changing who holds each role. Each member card lists that person's
+  means changing who holds each role. A member's picture comes from Gravatar
+  when their email has one, and is otherwise the first letter of their name. Each member card lists that person's
   open responsibilities.
 * **Fixtures.** What the building uses and what to buy when something is
   replaced: paint colours with swatches, light fittings, hardware, the

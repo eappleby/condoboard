@@ -230,6 +230,17 @@ through `ACCOUNT_TONE` and `FIXTURE_TONE`, falling back to blue. Category
 badges on responsibilities stay neutral so they do not compete with the
 status colours. New tones must meet AA on white and on their own tint.
 
+## People's pictures
+
+`avatar(m)` draws a member's Gravatar over the first letter of their first
+name. The hash is a SHA-256 of the trimmed, lowercased email, worked out by
+`hashEmails()` before the first render and after a member is saved, since
+hashing is async and rendering is not. The request uses `d=404`, and a
+capture phase `error` listener removes the image and remembers the hash in
+`noGravatar`, so the letter shows and the request is not repeated. This
+sends a hash of each member's email to gravatar.com. A vacant role shows
+the first letter of the role, and an unassigned item shows NA.
+
 ## Logo
 
 `logo.svg` is the monster face from the building's Halloween balcony
