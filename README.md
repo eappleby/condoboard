@@ -39,7 +39,7 @@ sample data and nothing is saved.
 * **Dashboard.** Overdue, due in the next 30 days, coming up later,
   recently completed, and anything with no date set. Five counters
   across the top, including the estimated cost of all active work.
-* **Responsibilities.** A searchable list, with status, category and role
+* **Responsibilities.** A searchable list, with status, category and person
   filters behind the Filter button, sortable by any column heading. Each item carries a category, priority,
   due date, the date it was last done, an estimated cost, a board role, an
   optional vendor, a repeat interval, and attached links.
@@ -56,8 +56,9 @@ sample data and nothing is saved.
 * **Board.** Roles and members. A responsibility is assigned to a role such
   as Treasurer, and a role is held by a member, so a change of board only
   means changing who holds each role. A member's picture comes from Gravatar
-  when their email has one, and is otherwise the first letter of their name. Each member card lists that person's
-  open responsibilities.
+  when their email has one, and is otherwise the first letter of their name. Each member tile opens that
+  person's details, and its responsibilities count opens the list filtered
+  to them.
 * **Fixtures.** What the building uses and what to buy when something is
   replaced: paint colours with swatches, light fittings, hardware, the
   intercom, appliances. Each one can carry documents.

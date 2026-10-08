@@ -65,7 +65,7 @@ whoever holds it through `board_roles.member_id`. Nothing assigns a
 responsibility to a person directly, which is the point: when the board
 changes, only the role holder is edited. `responsibilities.assignee_id` and
 `board_members.position` are dead columns kept for compatibility. Do not
-read or write them. `rolesOf()` and `tasksOfMember()` resolve a person to
+read or write them. `rolesOf()`, `tasksOfMember()` and `memberOfTask()` resolve a person to
 their responsibilities, and the email function joins
 `role:board_roles(name,member:board_members(name,email))`.
 
@@ -257,10 +257,20 @@ maps a key to a row value, empty values always sort last, and `aria-sort` on
 the `th` drives the arrow. With no key the default order applies: open items
 by due date, then done ones.
 
+Cards are kept short, by Evan's choice, with the rest in the dialog a card
+opens. A vendor card is company, service, website and the primary contact's
+email. An account card is name, category and website. A fixture card is the
+swatch, name, brand and number. Do not add lines back. Since document chips
+are no longer on cards, each saved row in the document editor has an Open
+link.
+
 The Board tab has a Roles grid and a Members grid. Role cards open the role
-modal. Member cards are not buttons, because they hold two buttons of their
-own: Responsibilities, which lists that person's open items under the grid
-through `boardMemberId`, and Edit.
+modal. A member tile is a `div`, not a button, because it holds two targets:
+the name is a button whose hit area is stretched over the whole tile and
+opens the member, and the responsibilities count is a link above it that
+opens the Responsibilities tab filtered to that person. The person filter
+goes by member through `memberOfTask()`, not by role, and Unassigned covers
+vacant roles too.
 
 ## Colour
 

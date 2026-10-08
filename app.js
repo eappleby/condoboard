@@ -399,6 +399,12 @@
       ? d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
       : String(d.getFullYear());
   }
+  // The person behind a responsibility, through its role. Null when it is
+  // unassigned or the role is vacant.
+  function memberOfTask(t) {
+    const r = roleById(t.role_id);
+    return (r && memberById(r.member_id) && r.member_id) || null;
+  }
   function firstName(t) {
     const r = roleById(t.role_id);
     const m = r && memberById(r.member_id);
@@ -427,7 +433,7 @@
     if (fStatus === "open") rows = rows.filter(isActive);
     else if (fStatus !== "all") rows = rows.filter((t) => t.status === fStatus);
     if (fCat) rows = rows.filter((t) => (t.category || "Other") === fCat);
-    if (fAss) rows = rows.filter((t) => fAss === "none" ? !roleById(t.role_id) : t.role_id === fAss);
+    if (fAss) rows = rows.filter((t) => (memberOfTask(t) || "none") === fAss);
     // Active is the default, so only another status counts as a filter.
     const active = [fStatus !== "open", fCat, fAss].filter(Boolean).length;
     $("filter-toggle").textContent = active ? "Filter (" + active + ")" : "Filter";
@@ -500,27 +506,22 @@
       (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0) || (a.position || 0) - (b.position || 0));
   }
 
+  // Cards carry only what identifies the record. Everything else is in the
+  // dialog the card opens.
+  function siteLink(url) {
+    return '<div class="contact-line"><a href="' + esc(safeUrl(url)) + '" target="_blank" rel="noopener">' +
+      esc(String(url).trim().replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/.*$/, "")) + "</a></div>";
+  }
+
   function vendorCard(v) {
-    const lines = [];
-    const people = contactsFor(v.id).map((c) =>
-      '<div class="contact-person"><span class="lbl">' + esc(c.name) + "</span>" +
-      (c.label ? "<span>" + esc(c.label) + "</span>" : "") +
-      (c.is_primary ? ' <span class="badge badge-open">Primary</span>' : "") +
-      (c.email ? '<a href="mailto:' + esc(c.email) + '" onclick="event.stopPropagation()">' + esc(c.email) + "</a>" : "") +
-      (c.phone ? '<a href="tel:' + esc(c.phone) + '" onclick="event.stopPropagation()">' + esc(c.phone) + "</a>" : "") +
-      "</div>").join("");
-    if (v.website) lines.push('<div class="contact-line"><span class="lbl">Website:</span> <a href="' + esc(safeUrl(v.website)) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + esc(v.website.replace(/^https?:\/\//, "")) + "</a></div>");
-    if (v.cost != null) {
-      lines.push('<div class="contact-line"><span class="lbl">Cost:</span> ' + esc(fmtMoney(v.cost)) +
-        (v.cost_period ? " " + esc(v.cost_period) : "") + "</div>");
-    }
+    const primary = contactsFor(v.id)[0];
     const tone = v.status === "recommended" ? "blue" : v.status === "past" ? "slate" : "green";
     return '<button type="button" class="info-card tone-' + tone + '" data-vendor="' + v.id + '">' +
       "<h3>" + esc(v.name) + "</h3>" +
       '<div class="sub">' + esc(v.service || VENDOR_STATUS_LABEL[v.status] || "") + "</div>" +
-      people + lines.join("") +
-      (v.notes ? '<div class="notes">' + esc(v.notes) + "</div>" : "") +
-      linkChips(linksFor("vendor", v.id)) + "</button>";
+      (v.website ? siteLink(v.website) : "") +
+      (primary && primary.email ? '<div class="contact-line"><a href="mailto:' + esc(primary.email) + '">' +
+        esc(primary.email) + "</a></div>" : "") + "</button>";
   }
 
   function renderVendors() {
@@ -536,22 +537,13 @@
   }
 
   function renderAccounts() {
-    $("account-grid").innerHTML = S.accounts.map((a) => {
-      const lines = [];
-      if (a.account_number) lines.push('<div class="contact-line"><span class="lbl">Account number:</span> ' + esc(a.account_number) + "</div>");
-      if (a.username) lines.push('<div class="contact-line"><span class="lbl">Username:</span> ' + esc(a.username) + "</div>");
-      if (a.portal_url) lines.push('<div class="contact-line"><span class="lbl">Portal:</span> <a href="' + esc(safeUrl(a.portal_url)) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open site</a></div>');
-      return '<button type="button" class="info-card tone-' + toneFor(ACCOUNT_TONE, a.category) + '" data-account="' + a.id + '">' +
+    $("account-grid").innerHTML = S.accounts.map((a) =>
+      '<button type="button" class="info-card tone-' + toneFor(ACCOUNT_TONE, a.category) + '" data-account="' + a.id + '">' +
         "<h3>" + esc(a.name) + "</h3>" +
         '<div class="sub">' + esc(a.category || "Account") + "</div>" +
-        lines.join("") +
-        (a.notes ? '<div class="notes">' + esc(a.notes) + "</div>" : "") +
-        linkChips(linksFor("account", a.id)) + "</button>";
-    }).join("");
+        (a.portal_url ? siteLink(a.portal_url) : "") + "</button>").join("");
     $("account-empty").hidden = S.accounts.length > 0;
   }
-
-  let boardMemberId = null;   // whose responsibilities are listed on the Board tab
 
   function renderMembers() {
     $("role-grid").innerHTML = sortedRoles().map((r) => {
@@ -560,43 +552,32 @@
       return '<button type="button" class="info-card tone-purple" data-role="' + r.id + '">' +
         "<h3>" + esc(r.name) + "</h3>" +
         '<div class="sub">' + esc(m ? m.name : "Vacant") + "</div>" +
-        '<div class="contact-line"><span class="lbl">Open items:</span> ' + count + "</div></button>";
+        '<div class="contact-line"><span class="lbl">Responsibilities:</span> ' + count + "</div></button>";
     }).join("") || '<p class="none">No roles yet.</p>';
 
+    // The whole tile opens the member through the name button, whose hit area
+    // is stretched over the card. The count sits above it as its own link.
     $("member-grid").innerHTML = S.members.map((m) => {
       const count = tasksOfMember(m.id).length;
       const sub = [rolesOf(m.id).map((r) => r.name).join(", ") || "No role"];
       if (m.apartment) sub.push("Apartment " + m.apartment);
-      const on = boardMemberId === m.id;
-      return '<div class="info-card info-card-static tone-blue">' +
-        '<div class="member-head">' + avatar(m, "avatar-lg") + "<div><h3>" + esc(m.name) + "</h3>" +
+      return '<div class="info-card card-stretch tone-blue">' +
+        '<div class="member-head">' + avatar(m, "avatar-lg") +
+        '<div><h3><button type="button" class="card-open" data-member="' + m.id + '">' + esc(m.name) + "</button></h3>" +
         '<div class="sub">' + esc(sub.join(", ")) + "</div></div></div>" +
-        (m.email ? '<div class="contact-line"><span class="lbl">Email:</span> <a href="mailto:' + esc(m.email) + '">' + esc(m.email) + "</a></div>" : "") +
-        (m.phone ? '<div class="contact-line"><span class="lbl">Phone:</span> <a href="tel:' + esc(m.phone) + '">' + esc(m.phone) + "</a></div>" : "") +
-        '<div class="card-actions">' +
-          '<button type="button" class="btn' + (on ? " is-on" : "") + '" data-member-tasks="' + m.id + '" aria-expanded="' + on +
-            '" aria-controls="member-tasks">Responsibilities (' + count + ")</button>" +
-          '<button type="button" class="btn" data-member="' + m.id + '">Edit</button>' +
-        "</div></div>";
+        '<div class="contact-line"><span class="lbl">Responsibilities:</span> ' +
+          '<a href="#" class="count-link" data-member-tasks="' + m.id + '" aria-label="' + count +
+          " responsibilities for " + esc(m.name) + '">' + count + "</a></div></div>";
     }).join("");
     $("member-empty").hidden = S.members.length > 0;
-
-    const who = memberById(boardMemberId);
-    $("member-tasks").hidden = !who;
-    if (who) {
-      const list = tasksOfMember(who.id).sort((a, b) =>
-        (a.due_date || "9999").localeCompare(b.due_date || "9999"));
-      $("member-tasks-title").textContent = "Responsibilities for " + who.name;
-      renderList("member-tasks-list", list, "Nothing assigned.");
-    }
   }
 
   function renderFilterOptions() {
     $("filter-category").innerHTML = '<option value="">All categories</option>' +
       CATEGORIES.map((c) => "<option>" + esc(c) + "</option>").join("");
     $("filter-assignee").innerHTML =
-      '<option value="">All roles</option><option value="none">Unassigned</option>' +
-      sortedRoles().map((r) => '<option value="' + r.id + '">' + esc(roleLabel(r)) + "</option>").join("");
+      '<option value="">Everyone</option><option value="none">Unassigned</option>' +
+      S.members.map((m) => '<option value="' + m.id + '">' + esc(m.name) + "</option>").join("");
   }
 
   function renderAll() {
@@ -701,6 +682,8 @@
             '<button type="button" class="doc-btn" data-move="down" data-i="' + i + '" ' +
               (i === draft.length - 1 ? "disabled " : "") + 'aria-label="Move down">Down</button>' +
             '<button type="button" class="doc-btn doc-rm" data-rm="' + i + '" aria-label="Remove">Remove</button>' +
+            ((l.url || "").trim() ? '<a class="doc-btn doc-open" href="' + esc(safeUrl(l.url)) +
+              '" target="_blank" rel="noopener">Open</a>' : "") +
           "</div></div>").join("");
 
       el.querySelectorAll("input[data-f]").forEach((input) =>
@@ -1143,7 +1126,6 @@
       await getStore().remove("members", id);
       S.members = S.members.filter((m) => m.id !== id);
       S.roles.forEach((r) => { if (r.member_id === id) r.member_id = null; });
-      if (boardMemberId === id) boardMemberId = null;
       closeModal("member-modal");
       toast("Removed.");
       renderFilterOptions();
@@ -1218,22 +1200,12 @@
   }
 
   function fixtureCard(f) {
-    const lines = [];
-    if (f.code) lines.push('<div class="contact-line"><span class="lbl">Number:</span> ' + esc(f.code) + "</div>");
-    if (f.location) lines.push('<div class="contact-line"><span class="lbl">Used for:</span> ' + esc(f.location) + "</div>");
-    if (f.url) {
-      lines.push('<div class="contact-line"><span class="lbl">Link:</span> <a href="' + esc(safeUrl(f.url)) +
-        '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open</a></div>');
-    }
     const swatch = f.color_hex
       ? '<span class="swatch" style="background:' + esc(f.color_hex) + '" aria-hidden="true"></span>'
       : "";
     return '<button type="button" class="info-card" data-fixture="' + f.id + '">' +
       '<h3 class="fixture-title">' + swatch + esc(f.name) + "</h3>" +
-      '<div class="sub">' + esc([f.brand, f.color_hex].filter(Boolean).join(", ") || f.category || "") + "</div>" +
-      lines.join("") +
-      (f.notes ? '<div class="notes">' + esc(f.notes) + "</div>" : "") +
-      linkChips(linksFor("fixture", f.id)) + "</button>";
+      '<div class="sub">' + esc([f.brand, f.code].filter(Boolean).join(", ") || f.category || "") + "</div></button>";
   }
 
   function openFixtureModal(f) {
@@ -1702,6 +1674,22 @@
       if (t) completeTask(t);
       return;
     }
+    // The count on a member tile opens the Responsibilities tab on that person.
+    const mt = e.target.closest("[data-member-tasks]");
+    if (mt) {
+      e.preventDefault();
+      $("filter-status").value = "open";
+      $("filter-category").value = "";
+      $("filter-assignee").value = mt.dataset.memberTasks;
+      $("task-search").value = "";
+      $("filter-panel").hidden = false;
+      $("filter-toggle").setAttribute("aria-expanded", "true");
+      renderTaskTable();
+      showView("tasks");
+      window.scrollTo(0, 0);
+      $("filter-assignee").focus();
+      return;
+    }
     if (e.target.closest("a")) return;
     const card = e.target.closest("[data-task]");
     if (card) { const t = S.tasks.find((x) => x.id === card.dataset.task); if (t) openTaskModal(t); return; }
@@ -1715,16 +1703,6 @@
     if (sc) { const x = S.schedules.find((y) => y.id === sc.dataset.schedule); if (x) openScheduleModal(x); return; }
     const rc = e.target.closest("[data-role]");
     if (rc) { const r = roleById(rc.dataset.role); if (r) openRoleModal(r); return; }
-    const mt = e.target.closest("[data-member-tasks]");
-    if (mt) {
-      boardMemberId = boardMemberId === mt.dataset.memberTasks ? null : mt.dataset.memberTasks;
-      renderMembers();
-      if (boardMemberId) {
-        $("member-tasks-title").focus();
-        $("member-tasks").scrollIntoView({ block: "nearest" });
-      }
-      return;
-    }
     const mc = e.target.closest("[data-member]");
     if (mc) { const m = memberById(mc.dataset.member); if (m) openMemberModal(m); return; }
   });
