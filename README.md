@@ -61,10 +61,11 @@ sample data and nothing is saved.
 * **Schedules.** Rotating duties such as the trash and recycling roster.
   Give a row its months and the site marks whose turn it is right now.
 * **Settings.** Monthly or Never, the day it goes out, and a preview.
-* **Monthly summary email.** Off until you switch it on. It has three parts:
-  anything overdue in full, the month ahead in full with who is responsible,
-  vendor contacts, documents and costs, then the month after that as a short
-  list of names and who has them.
+* **Monthly summary email.** Off until you switch it on. It opens with the
+  logo and three counters, then a table of everything overdue, due in the
+  month ahead and due in the month after. Below that, overdue items and the
+  month ahead appear in full with who is responsible, vendor contacts,
+  documents and costs.
 * **Documents.** Every responsibility, vendor, account and fixture can hold a
   list of documents. Edit a label or address in place, drag rows to reorder them, or
   use the up and down buttons.

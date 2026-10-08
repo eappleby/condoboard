@@ -116,8 +116,25 @@ content can be tested with Deno without touching the network. Run
 them. The `Deno.serve` call is guarded by `import.meta.main`, so importing
 the module in a test does not start a server.
 
-Structure: overdue in full, the month ahead in full, the month after as a
-slim list. `coveredMonths()` decides which months those are. On or before
+Structure: a header with the logo, the name and three counters, then one
+table listing everything overdue, due in the month ahead and due in the
+month after, then overdue in full and the month ahead in full. The month
+after appears only in the table. Empty sections are left out, and there is
+no footer and no link back to the site, by Evan's choice.
+
+The look copies the site: the same red, amber and blue as the dashboard,
+status labels as pills, cards with a coloured left edge. `TONE` holds the
+colours, so change them there if `style.css` changes. Layout is tables with
+inline styles because mail clients ignore stylesheets. The logo is an `img`
+pointing at `apple-touch-icon.png` on the site, since mail clients do not
+render SVG, so it needs the site to be deployed. `APP_URL` sets the site
+address and falls back to `DEFAULT_APP_URL`.
+
+There is no Deno in the container. To test, copy `index.ts` without the
+`npm:` import line and import `buildDigest` from a script run with
+`node --experimental-strip-types`.
+
+`coveredMonths()` decides which months those are. On or before
 the 20th the detailed month is the current one, from the 21st it rolls to the
 next. It handles the year boundary. If that rule changes, change the wording
 on the Settings tab and in README.md too, since both explain it.

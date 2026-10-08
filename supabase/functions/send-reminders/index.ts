@@ -6,10 +6,12 @@
 // reminders_enabled is false, so the cron can be scheduled well before the
 // board is ready to receive anything.
 //
-// The email has three parts:
+// The email has four parts:
+//   Header           logo, name, and three counters like the dashboard's
+//   Table            everything overdue, due in the month ahead, and due in
+//                    the month after, one row each
 //   Overdue          full detail, however far past it is
 //   The month ahead  full detail, with contacts, documents and costs
-//   The month after  names and who is responsible, nothing more
 //
 // Which month counts as "ahead" depends on when it is sent. On or before the
 // 20th it is the current month, since most of it is still to come. From the
@@ -24,7 +26,7 @@
 // Secrets:
 //   RESEND_API_KEY   required, from https://resend.com
 //   FROM_EMAIL       sender. Defaults to the Resend testing sender.
-//   APP_URL          optional. Linked at the bottom of the email.
+//   APP_URL          optional. The site address, which serves the logo.
 //
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided automatically.
 
@@ -69,6 +71,9 @@ const CORS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
+
+// Where the logo is fetched from when APP_URL is not set.
+const DEFAULT_APP_URL = "https://37212th.pages.dev";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"];
@@ -138,6 +143,11 @@ function money(n: number | null): string {
   return "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function shortDate(s: string): string {
+  const d = new Date(s + "T00:00:00Z");
+  return `${MONTHS[d.getUTCMonth()].slice(0, 3)} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
+}
+
 function prettyDate(s: string): string {
   const d = new Date(s + "T00:00:00Z");
   return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
@@ -151,14 +161,20 @@ function overdueLabel(due: string, today: string): string {
     : `overdue by ${days} ${days === 1 ? "day" : "days"}`;
 }
 
+// Colours match the site, so the email reads as part of the same tracker:
+// red for overdue, amber for the month ahead, blue for the month after.
+const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const TONE = {
+  overdue: { fg: "#b3261e", bg: "#fdeceb", line: "#e8b4b0" },
+  ahead:   { fg: "#8a4b08", bg: "#fdf1e1", line: "#e0bd8c" },
+  after:   { fg: "#16389f", bg: "#e8eefc", line: "#b7c9f2" },
+};
+type ToneName = keyof typeof TONE;
+
 const L = {
-  card: 'style="border:1px solid #cfd8e3;border-radius:8px;padding:14px 16px;margin:0 0 12px"',
-  title: 'style="font-size:17px;font-weight:bold;margin:0 0 6px"',
-  row: 'style="margin:4px 0;color:#47576a;font-size:15px"',
+  row: 'style="margin:4px 0;color:#47576a;font-size:15px;line-height:1.5"',
   lbl: 'style="color:#16202b;font-weight:bold"',
-  h2: 'style="font-size:18px;margin:26px 0 12px;padding-bottom:6px;border-bottom:2px solid #cfd8e3"',
-  slim: 'style="margin:6px 0;font-size:15px"',
-  link: 'style="color:#1d4ed8"',
+  link: 'style="color:#16389f"',
 };
 
 /** The role and whoever holds it, such as "Treasurer, Mitch Herrera". */
@@ -167,13 +183,51 @@ function responsible(t: Task, fallback: string): string {
   return t.role.name + ", " + (t.role.member?.name || "vacant");
 }
 
+function pill(text: string, tone: ToneName): string {
+  const c = TONE[tone];
+  return `<span style="display:inline-block;background:${c.bg};color:${c.fg};border:1px solid ${c.line};` +
+    `border-radius:6px;padding:3px 10px;font-size:13px;font-weight:bold;white-space:nowrap">${escapeHtml(text)}</span>`;
+}
+
+/** A counter like the ones across the top of the dashboard. */
+function statTile(n: number, label: string, tone: ToneName): string {
+  const c = TONE[tone];
+  return `<td width="32%" valign="top">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate"><tr>` +
+    `<td style="background:#ffffff;border:1px solid #cfd8e3;border-left:6px solid ${c.fg};border-radius:10px;padding:12px 14px">` +
+    `<div style="font-size:28px;font-weight:bold;line-height:1.15;color:${c.fg}">${n}</div>` +
+    `<div style="font-size:14px;color:#47576a;margin-top:2px">${escapeHtml(label)}</div>` +
+    `</td></tr></table></td>`;
+}
+
+/** A section heading in the style of the dashboard's status labels. */
+function sectionHead(text: string, tone: ToneName): string {
+  const c = TONE[tone];
+  return `<p style="margin:28px 0 12px"><span style="display:inline-block;background:${c.bg};color:${c.fg};` +
+    `border:1px solid ${c.line};border-radius:6px;padding:5px 12px;font-size:14px;font-weight:bold;` +
+    `text-transform:uppercase;letter-spacing:.05em">${escapeHtml(text)}</span></p>`;
+}
+
+/** One row of the summary table. */
+function tableRow(t: Task, tone: ToneName, label: string, last: boolean): string {
+  const c = TONE[tone];
+  const edge = last ? "" : "border-bottom:1px solid #cfd8e3;";
+  const cell = `padding:12px 10px;vertical-align:top;font-size:15px;line-height:1.4;${edge}`;
+  return `<tr>` +
+    `<td style="${cell}border-left:6px solid ${c.fg}">` +
+      `<div style="font-weight:bold;color:#16202b">${escapeHtml(t.title)}</div>` +
+      `<div style="color:#47576a;font-size:14px;margin-top:2px">${escapeHtml(responsible(t, "Unassigned"))}</div></td>` +
+    `<td style="${cell}color:${tone === "overdue" ? c.fg : "#16202b"};white-space:nowrap">${escapeHtml(shortDate(t.due_date))}</td>` +
+    `<td align="right" style="${cell}">${pill(label, tone)}</td></tr>`;
+}
+
 /** One responsibility, in full, with everything needed to act on it. */
-function detailedItem(t: Task, today: string): string {
+function detailedItem(t: Task, today: string, tone: ToneName): string {
   const rows: string[] = [];
   const when = t.due_date < today
     ? `${prettyDate(t.due_date)}, ${overdueLabel(t.due_date, today)}`
     : prettyDate(t.due_date);
-  rows.push(`<p ${L.row}><span ${L.lbl}>Due:</span> ${escapeHtml(when)}</p>`);
+  rows.push(`<p ${L.row}><span ${L.lbl}>Due:</span> <span style="color:${TONE[tone].fg};font-weight:bold">${escapeHtml(when)}</span></p>`);
   rows.push(`<p ${L.row}><span ${L.lbl}>Responsible:</span> ${escapeHtml(responsible(t, "Nobody assigned yet"))}` +
     (t.role?.member?.email ? ` (${escapeHtml(t.role.member.email)})` : "") + "</p>");
   if (t.estimated_cost != null) {
@@ -198,19 +252,15 @@ function detailedItem(t: Task, today: string): string {
     rows.push(`<p ${L.row}><span ${L.lbl}>Documents:</span> ${list}</p>`);
   }
   if (t.description) {
-    rows.push(`<p ${L.row}>${escapeHtml(t.description)}</p>`);
+    rows.push(`<p style="margin:10px 0 0;padding-top:10px;border-top:1px solid #cfd8e3;color:#47576a;font-size:14px;line-height:1.5">${escapeHtml(t.description)}</p>`);
   }
-  const flag = t.priority === "high" ? ' <span style="color:#b3261e">(high priority)</span>' : "";
-  return `<div ${L.card}><p ${L.title}>${escapeHtml(t.title)}${flag}</p>` +
-    `<p ${L.row}><span ${L.lbl}>Category:</span> ${escapeHtml(t.category || "Other")}</p>` +
-    rows.join("") + "</div>";
-}
-
-/** One responsibility, stripped back to the name and who has it. */
-function slimItem(t: Task): string {
-  return `<p ${L.slim}><strong>${escapeHtml(t.title)}</strong>, ` +
-    `${escapeHtml(responsible(t, "nobody assigned yet"))}` +
-    `<span style="color:#47576a"> (${escapeHtml(prettyDate(t.due_date))})</span></p>`;
+  const badges = `<span style="display:inline-block;background:#eceff3;color:#3f5060;border:1px solid #cfd8e3;` +
+    `border-radius:6px;padding:3px 10px;font-size:13px;font-weight:bold">${escapeHtml(t.category || "Other")}</span>` +
+    (t.priority === "high" ? " " + pill("High priority", "overdue") : "");
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;margin:0 0 12px"><tr>` +
+    `<td style="background:#ffffff;border:1px solid #cfd8e3;border-left:6px solid ${TONE[tone].fg};border-radius:10px;padding:14px 16px">` +
+    `<p style="font-size:17px;font-weight:bold;margin:0 0 8px;color:#16202b">${escapeHtml(t.title)}</p>` +
+    `<p style="margin:0 0 8px">${badges}</p>` + rows.join("") + `</td></tr></table>`;
 }
 
 /**
@@ -223,6 +273,8 @@ export function buildDigest(
 ): { html: string; subject: string; taskIds: string[]; counts: { overdue: number; ahead: number; after: number } } {
   const today = iso(opts.now);
   const { aheadStart, aheadEnd, afterEnd, aheadName, afterName } = coveredMonths(opts.now);
+  const aheadMonth = aheadName.split(" ")[0];
+  const afterMonth = afterName.split(" ")[0];
 
   const overdue = tasks.filter((t) => t.due_date < today)
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
@@ -232,38 +284,57 @@ export function buildDigest(
   const after = tasks.filter((t) => t.due_date >= iso(afterStart) && t.due_date <= iso(afterEnd))
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
 
-  const parts: string[] = [];
-  parts.push(`<p style="font-size:16px;margin:0 0 4px">Here is where the building stands for <strong>${escapeHtml(aheadName)}</strong>.</p>`);
+  // The logo is served by the site, since mail clients do not show SVG or
+  // inline images reliably.
+  const site = (opts.appUrl || DEFAULT_APP_URL).replace(/\/$/, "");
+  const header =
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>` +
+    `<td width="56" valign="middle"><img src="${escapeHtml(site)}/apple-touch-icon.png" width="48" height="48" alt="" style="display:block;border-radius:11px"></td>` +
+    `<td valign="middle" style="font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1;color:#16202b">372 <span style="color:#4a2f8f">12<span style="font-size:15px;vertical-align:top;letter-spacing:.03em">TH</span></span></td>` +
+    `<td valign="middle" align="right" style="font-size:14px;color:#47576a;line-height:1.4">Board summary<br><strong style="color:#16202b;font-size:16px">${escapeHtml(aheadName)}</strong></td>` +
+    `</tr></table>`;
 
+  const stats =
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0"><tr>` +
+    statTile(overdue.length, "Overdue", "overdue") + `<td width="2%"></td>` +
+    statTile(ahead.length, "Due in " + aheadMonth, "ahead") + `<td width="2%"></td>` +
+    statTile(after.length, "Due in " + afterMonth, "after") +
+    `</tr></table>`;
+
+  const listed: { t: Task; tone: ToneName; label: string }[] = [
+    ...overdue.map((t) => ({ t, tone: "overdue" as ToneName, label: "Overdue" })),
+    ...ahead.map((t) => ({ t, tone: "ahead" as ToneName, label: aheadMonth })),
+    ...after.map((t) => ({ t, tone: "after" as ToneName, label: afterMonth })),
+  ];
+  const th = 'style="text-align:left;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:#47576a;' +
+    'padding:12px 14px;border-bottom:2px solid #cfd8e3;background:#f8fafc"';
+  const table = listed.length
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;background:#ffffff;border:1px solid #cfd8e3;border-radius:10px;overflow:hidden">` +
+      `<tr><th ${th}>Responsibility</th><th ${th}>Due</th><th ${th}></th></tr>` +
+      listed.map((x, i) => tableRow(x.t, x.tone, x.label, i === listed.length - 1)).join("") + `</table>`
+    : `<p ${L.row}>Nothing is overdue, and nothing is due through ${escapeHtml(afterName)}.</p>`;
+
+  const parts: string[] = [header, stats];
+  parts.push(`<h2 style="font-size:18px;margin:28px 0 12px;color:#16202b">Upcoming responsibilities</h2>`);
+  parts.push(table);
   if (overdue.length) {
-    parts.push(`<h2 ${L.h2}>Overdue (${overdue.length})</h2>`);
-    parts.push(overdue.map((t) => detailedItem(t, today)).join(""));
+    parts.push(sectionHead("Overdue", "overdue"));
+    parts.push(overdue.map((t) => detailedItem(t, today, "overdue")).join(""));
+  }
+  if (ahead.length) {
+    parts.push(sectionHead("Due in " + aheadName, "ahead"));
+    parts.push(ahead.map((t) => detailedItem(t, today, "ahead")).join(""));
   }
 
-  parts.push(`<h2 ${L.h2}>${escapeHtml(aheadName)} (${ahead.length})</h2>`);
-  parts.push(ahead.length
-    ? ahead.map((t) => detailedItem(t, today)).join("")
-    : `<p ${L.row}>Nothing is due this month.</p>`);
-
-  parts.push(`<h2 ${L.h2}>Coming in ${escapeHtml(afterName)} (${after.length})</h2>`);
-  parts.push(after.length
-    ? after.map(slimItem).join("")
-    : `<p ${L.row}>Nothing is due that month.</p>`);
-
-  const link = opts.appUrl
-    ? `<p style="margin-top:26px"><a href="${escapeHtml(opts.appUrl)}" ${L.link}>Open the board tracker</a> to mark something done or change a date.</p>`
-    : "";
-
-  const html = `<div style="font-family:Helvetica,Arial,sans-serif;font-size:16px;color:#16202b;line-height:1.5;max-width:680px">
-<h1 style="font-size:22px;margin:0 0 2px">372 12th</h1>
+  const html = `<div style="background:#f4f6f9;padding:24px 12px;font-family:${FONT};font-size:16px;color:#16202b;line-height:1.5">
+<div style="max-width:640px;margin:0 auto">
 ${parts.join("\n")}
-${link}
-<p style="color:#47576a;font-size:14px;margin-top:24px;border-top:1px solid #cfd8e3;padding-top:12px">Sent automatically by the 372 12th board tracker. Change how often these arrive, or turn them off, on the Settings tab.</p>
+</div>
 </div>`;
 
   const headline = overdue.length
-    ? `${overdue.length} overdue, ${ahead.length} due in ${aheadName.split(" ")[0]}`
-    : `${ahead.length} due in ${aheadName.split(" ")[0]}`;
+    ? `${overdue.length} overdue, ${ahead.length} due in ${aheadMonth}`
+    : `${ahead.length} due in ${aheadMonth}`;
 
   return {
     html,
