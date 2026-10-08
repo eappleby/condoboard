@@ -14,7 +14,7 @@
     none: "", monthly: "Monthly", quarterly: "Quarterly",
     semiannual: "Every 6 months", annual: "Yearly",
     biennial: "Every 2 years", three_year: "Every 3 years",
-    four_year: "Every 4 years", five_year: "Every 5 years",
+    four_year: "Every 4 years", five_year: "Every 5 years", ongoing: "Ongoing",
   };
   const RECUR_MONTHS = {
     monthly: 1, quarterly: 3, semiannual: 6, annual: 12,
@@ -25,6 +25,9 @@
   // migration folds into open, and it reads as Active until then.
   const STATUS_LABEL = { open: "Active", in_progress: "Active", done: "Complete", canceled: "Canceled" };
   function isActive(t) { return t.status === "open" || t.status === "in_progress"; }
+  // Ongoing work has no due date and is never marked done, only ended by
+  // completing or canceling it in its dialog.
+  function isOngoing(t) { return t.recurrence === "ongoing"; }
   const VENDOR_STATUS_LABEL = { contracted: "Under contract", recommended: "Recommended", past: "No longer used" };
 
   // ------------------------------------------------------------------
@@ -208,6 +211,7 @@
   }
   function dueText(t) {
     if (t.status === "canceled") return { text: "Canceled", cls: "" };
+    if (isOngoing(t) && isActive(t)) return { text: "Ongoing", cls: "" };
     if (t.status === "done") {
       const when = t.completed_at ? ymd(new Date(t.completed_at)) : t.due_date;
       return { text: when ? "Completed " + fmtDate(when) : "Completed", cls: "" };
@@ -335,7 +339,7 @@
     const v = vendorById(t.vendor_id);
     const bits = ['<span class="badge badge-cat">' + esc(t.category || "Other") + "</span>"];
     if (t.priority === "high" && isActive(t)) bits.push('<span class="badge badge-high">High priority</span>');
-    if (t.recurrence && t.recurrence !== "none") bits.push("<span>Repeats " + RECUR_LABEL[t.recurrence].toLowerCase() + "</span>");
+    if (isRecurring(t)) bits.push("<span>Repeats " + RECUR_LABEL[t.recurrence].toLowerCase() + "</span>");
     if (t.estimated_cost != null) bits.push('<span class="badge badge-cost">' + esc(fmtMoney(t.estimated_cost)) + "</span>");
     if (v) bits.push("<span>" + esc(v.name) + "</span>");
     if (doneOn && isActive(t) && t.due_date) bits.push("<span>Next due " + esc(fmtDate(t.due_date)) + "</span>");
@@ -360,7 +364,8 @@
       .sort((a, b) => a.due_date.localeCompare(b.due_date));
     const later = open.filter((t) => { const n = daysUntil(t.due_date); return n != null && n > 30; })
       .sort((a, b) => a.due_date.localeCompare(b.due_date));
-    const nodate = open.filter((t) => !t.due_date);
+    const nodate = open.filter((t) => !t.due_date && !isOngoing(t));
+    const ongoing = open.filter(isOngoing).sort((a, b) => a.title.localeCompare(b.title));
     const done = S.tasks.map((t) => ({
       t: t,
       on: t.status === "done" ? (t.completed_at ? ymd(new Date(t.completed_at)) : t.due_date)
@@ -384,6 +389,7 @@
       ? done.map((x) => taskCard(x.t, x.on)).join("")
       : '<p class="none">Nothing completed yet.</p>';
     renderList("list-nodate", nodate, "Everything has a date.");
+    renderList("list-ongoing", ongoing, "Nothing ongoing.");
   }
 
   function linksFor(kind, id) {
@@ -488,12 +494,12 @@
           linkChips(linksFor("task", t.id)) + "</td>" +
         "<td>" + esc(firstName(t)) + "</td>" +
         '<td class="t-date ' + (!done && due.cls ? "due-" + due.cls : "") + '" title="' + esc(due.text) + '">' +
-          flag + esc(shortDate(when)) + "</td>" +
+          flag + esc(isOngoing(t) && !done ? "Ongoing" : shortDate(when)) + "</td>" +
         '<td class="t-date">' + esc(shortDate(t.last_completed_on)) + "</td>" +
         "<td>" + (t.estimated_cost != null ? esc(fmtMoney(t.estimated_cost)) : "") + "</td>" +
         '<td class="t-status">' + (showStatus ? '<span class="badge badge-' + (isActive(t) ? "open" : t.status) + '">' +
           STATUS_LABEL[t.status] + "</span>" : "") +
-          (!done ? '<button type="button" class="btn-done" data-done="' + t.id + '" aria-label="Mark done">' +
+          (!done && !isOngoing(t) ? '<button type="button" class="btn-done" data-done="' + t.id + '" aria-label="Mark done">' +
             '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">' +
             '<path d="M2.5 8.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.2" ' +
             'stroke-linecap="round" stroke-linejoin="round"/></svg>Done</button>' : "") +
@@ -805,6 +811,7 @@
     $("tf-lastdone").value = t ? (t.last_completed_on || "") : "";
     $("tf-cost").value = t && t.estimated_cost != null ? t.estimated_cost : "";
     $("tf-recurrence").value = t ? (t.recurrence || "none") : "none";
+    syncOngoing();
     fillSelect($("tf-assignee"), sortedRoles().map((r) => ({ id: r.id, name: roleLabel(r) })),
       t ? t.role_id : "", "Unassigned");
     fillSelect($("tf-vendor"), S.vendors, t ? t.vendor_id : "", "None");
@@ -814,6 +821,14 @@
     openModal("task-modal");
     $("tf-title").focus();
   }
+
+  // An ongoing item has no due date, so the field is cleared and disabled.
+  function syncOngoing() {
+    const on = $("tf-recurrence").value === "ongoing";
+    $("tf-due").disabled = on;
+    if (on) $("tf-due").value = "";
+  }
+  $("tf-recurrence").addEventListener("change", syncOngoing);
 
   $("task-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -827,7 +842,7 @@
       description: $("tf-desc").value.trim() || null,
       category: $("tf-category").value,
       priority: $("tf-priority").value,
-      due_date: $("tf-due").value || null,
+      due_date: $("tf-recurrence").value === "ongoing" ? null : ($("tf-due").value || null),
       last_completed_on: $("tf-lastdone").value || null,
       estimated_cost: costVal === "" ? null : Number(costVal),
       recurrence: $("tf-recurrence").value,
@@ -1692,7 +1707,32 @@
       else t.removeAttribute("aria-current");
     });
     VIEWS.forEach((v) => { $("view-" + v).hidden = v !== name; });
+    // Keep the address in step so a tab can be linked to and reloaded.
+    try { history.replaceState(null, "", "#" + name); } catch (e) { /* file:// in some browsers */ }
   }
+
+  // Links into the site, used by the monthly email. "#vendors" opens a tab,
+  // and "#vendor/<id>" opens that tab with the record's dialog on top.
+  const ROUTES = {
+    task: ["tasks", (id) => S.tasks.find((x) => x.id === id), (x) => openTaskModal(x)],
+    vendor: ["vendors", (id) => vendorById(id), (x) => openVendorModal(x)],
+    account: ["accounts", (id) => accountById(id), (x) => openAccountModal(x)],
+    member: ["board", (id) => memberById(id), (x) => openMemberModal(x)],
+    role: ["board", (id) => roleById(id), (x) => openRoleModal(x)],
+    fixture: ["fixtures", (id) => S.fixtures.find((y) => y.id === id), (x) => openFixtureModal(x)],
+    schedule: ["schedules", (id) => S.schedules.find((y) => y.id === id), (x) => openScheduleModal(x)],
+  };
+  function route() {
+    const [kind, id] = decodeURIComponent(location.hash.replace(/^#/, "")).split("/");
+    if (!kind) return;
+    if (VIEWS.includes(kind)) { showView(kind); return; }
+    const r = ROUTES[kind];
+    if (!r) return;
+    const rec = r[1](id);
+    showView(r[0]);
+    if (rec) r[2](rec);
+  }
+  window.addEventListener("hashchange", () => { if (S.tasks.length || S.members.length) route(); });
 
   document.querySelectorAll(".tab").forEach((tab) =>
     tab.addEventListener("click", () => {
@@ -1843,6 +1883,7 @@
       await hashEmails();
       renderFilterOptions();
       renderAll();
+      route();
     } catch (e) {
       fail(e);
       renderSettings();

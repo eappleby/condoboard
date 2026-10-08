@@ -264,6 +264,7 @@ textarea.input { min-height: 80px; }
 .status-key-soon     { background: var(--amber-soft);  color: var(--amber);   border: 1px solid #e0bd8c; }
 .status-key-later    { background: var(--primary-soft);color: var(--primary-dark); border: 1px solid #b7c9f2; }
 .status-key-done     { background: var(--green-soft);  color: var(--green);   border: 1px solid #a9d5b7; }
+.status-key-ongoing  { background: var(--purple-soft); color: var(--purple);  border: 1px solid #cbb6f0; }
 .status-key-nodate   { background: var(--slate-soft);  color: var(--slate);   border: 1px solid var(--border-strong); }
 
 .card-list { display: flex; flex-direction: column; gap: 12px; }

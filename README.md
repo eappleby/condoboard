@@ -45,6 +45,8 @@ sample data and nothing is saved.
   optional vendor, a repeat interval, and attached links.
 * **Statuses.** Active, Complete or Canceled. The list shows active items
   until the filter says otherwise, and overdue is shown by a red due date.
+* **Ongoing duties.** Choose Ongoing under Repeats for work with no due
+  date, such as cleaning. It stays active and has its own dashboard section.
 * **Recurring duties.** Mark a repeating item done and it stays active. Today
   is recorded as the last time it was done and the due date moves to the
   next cycle. Intervals run from monthly through every five years.
@@ -71,7 +73,8 @@ sample data and nothing is saved.
   apartment on trash, then a table of everything overdue, due in the
   month ahead and due in the month after. Below that, overdue items and the
   month ahead appear in full with who is responsible, vendor contacts,
-  documents and costs.
+  documents and costs. Every responsibility, person, vendor and schedule in
+  the email links to its page on the site.
 * **Documents.** Every responsibility, vendor, account and fixture can hold a
   list of documents. Edit a label or address in place, drag rows to reorder them, or
   use the up and down buttons.

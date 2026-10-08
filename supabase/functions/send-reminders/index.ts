@@ -28,13 +28,15 @@
 // Secrets:
 //   RESEND_API_KEY   required, from https://resend.com
 //   FROM_EMAIL       sender. Defaults to the Resend testing sender.
-//   APP_URL          optional. The site address, which serves the logo.
+//   APP_URL          optional. The site address. It serves the logo, and
+//                    every name in the email links into it.
 //
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided automatically.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 export type Vendor = {
+  id?: string;
   name: string;
   website: string | null;
   // Retired single contact columns, read only when a vendor has no contacts.
@@ -66,13 +68,14 @@ export type Task = {
   category: string;
   estimated_cost: number | null;
   last_completed_on: string | null;
-  role: { name: string; member: { name: string; email: string | null } | null } | null;
+  role: { name: string; member: { id?: string; name: string; email: string | null } | null } | null;
   vendor: Vendor | null;
   links: { title: string | null; url: string; sort_order: number | null }[] | null;
 };
 
 /** A rotation from the Schedules tab, such as trash and recycling. */
 export type Schedule = {
+  id?: string;
   name: string;
   position?: number | null;
   schedule_slots: {
@@ -210,10 +213,22 @@ const L = {
   link: 'style="color:#16389f"',
 };
 
-/** The role and whoever holds it, such as "Treasurer, Mitch Herrera". */
-function responsible(t: Task, fallback: string): string {
-  if (!t.role) return fallback;
-  return t.role.name + ", " + (t.role.member?.name || "vacant");
+// Everything in the email that names something on the site links to it.
+// The site reads the part after # and opens that tab or record.
+let SITE = DEFAULT_APP_URL;
+function href(path: string): string {
+  return escapeHtml(SITE + "/" + (path ? "#" + path : ""));
+}
+/** A link that keeps the surrounding text's look. */
+function a(path: string, inner: string, style = ""): string {
+  return `<a href="${href(path)}" style="color:inherit;text-decoration:none;${style}">${inner}</a>`;
+}
+/** "Treasurer, Mitch Herrera", with the person linking to their page. */
+function responsibleHtml(t: Task, fallback: string): string {
+  if (!t.role) return escapeHtml(fallback);
+  const m = t.role.member;
+  const who = m ? (m.id ? a("member/" + m.id, escapeHtml(m.name), "text-decoration:underline") : escapeHtml(m.name)) : "vacant";
+  return escapeHtml(t.role.name) + ", " + who;
 }
 
 function pill(text: string, tone: ToneName): string {
@@ -223,22 +238,22 @@ function pill(text: string, tone: ToneName): string {
 }
 
 /** A counter like the ones across the top of the dashboard. */
-function statTile(n: number, label: string, tone: ToneName): string {
+function statTile(n: number, label: string, tone: ToneName, path: string): string {
   const c = TONE[tone];
-  return `<td width="32%" valign="top">` +
+  return `<td width="32%" valign="top"><a href="${href(path)}" style="display:block;color:inherit;text-decoration:none">` +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate"><tr>` +
     `<td style="background:#ffffff;border:1px solid #cfd8e3;border-left:6px solid ${c.fg};border-radius:10px;padding:12px 14px">` +
     `<div style="font-size:28px;font-weight:bold;line-height:1.15;color:${c.fg}">${n}</div>` +
     `<div style="font-size:14px;color:#47576a;margin-top:2px">${escapeHtml(label)}</div>` +
-    `</td></tr></table></td>`;
+    `</td></tr></table></a></td>`;
 }
 
 /** A section heading in the style of the dashboard's status labels. */
-function sectionHead(text: string, tone: ToneName): string {
+function sectionHead(text: string, tone: ToneName, path: string): string {
   const c = TONE[tone];
-  return `<p style="margin:28px 0 12px"><span style="display:inline-block;background:${c.bg};color:${c.fg};` +
-    `border:1px solid ${c.line};border-radius:6px;padding:5px 12px;font-size:14px;font-weight:bold;` +
-    `text-transform:uppercase;letter-spacing:.05em">${escapeHtml(text)}</span></p>`;
+  return `<p style="margin:28px 0 12px"><a href="${href(path)}" style="display:inline-block;background:${c.bg};color:${c.fg};` +
+    `border:1px solid ${c.line};border-radius:6px;padding:5px 12px;font-size:14px;font-weight:bold;text-decoration:none;` +
+    `text-transform:uppercase;letter-spacing:.05em">${escapeHtml(text)}</a></p>`;
 }
 
 /** Whoever is up for a schedule in a given month, 1 to 12. Same rule as the site. */
@@ -265,13 +280,13 @@ function scheduleTable(schedules: Schedule[], aheadMonth: string, aheadNum: numb
     ? `<div style="font-weight:bold;color:#16202b">${escapeHtml(s.responsible || "Not set")}</div>` +
       `<div style="color:#47576a;font-size:14px;margin-top:2px">${escapeHtml(s.label)}</div>`
     : `<span style="color:#47576a">Not set</span>`;
-  return `<h2 style="font-size:18px;margin:28px 0 12px;color:#16202b">Schedules</h2>` +
+  return `<h2 style="font-size:18px;margin:28px 0 12px;color:#16202b">${a("schedules", "Schedules")}</h2>` +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;background:#ffffff;border:1px solid #cfd8e3;border-radius:10px;overflow:hidden">` +
     `<tr><th ${th}>Schedule</th><th ${th}>${escapeHtml(aheadMonth)}</th><th ${th}>${escapeHtml(afterMonth)}</th></tr>` +
     rows.map((x, i) => {
       const cell = `padding:12px 10px;vertical-align:top;font-size:15px;line-height:1.4;overflow-wrap:anywhere;` +
         (i === rows.length - 1 ? "" : "border-bottom:1px solid #cfd8e3;");
-      return `<tr><td style="${cell}border-left:6px solid ${g.fg};font-weight:bold;color:#16202b">${escapeHtml(x.sc.name)}</td>` +
+      return `<tr><td style="${cell}border-left:6px solid ${g.fg};font-weight:bold;color:#16202b">${a(x.sc.id ? "schedule/" + x.sc.id : "schedules", escapeHtml(x.sc.name))}</td>` +
         `<td style="${cell}">${who(x.a)}</td><td style="${cell}">${who(x.b)}</td></tr>`;
     }).join("") + `</table>`;
 }
@@ -283,8 +298,8 @@ function tableRow(t: Task, tone: ToneName, label: string, last: boolean): string
   const cell = `padding:12px 10px;vertical-align:top;font-size:15px;line-height:1.4;${edge}`;
   return `<tr>` +
     `<td style="${cell}border-left:6px solid ${c.fg}">` +
-      `<div style="font-weight:bold;color:#16202b">${escapeHtml(t.title)}</div>` +
-      `<div style="color:#47576a;font-size:14px;margin-top:2px">${escapeHtml(responsible(t, "Unassigned"))}</div></td>` +
+      `<div style="font-weight:bold;color:#16202b">${a("task/" + t.id, escapeHtml(t.title))}</div>` +
+      `<div style="color:#47576a;font-size:14px;margin-top:2px">${responsibleHtml(t, "Unassigned")}</div></td>` +
     `<td style="${cell}color:${tone === "overdue" ? c.fg : "#16202b"};white-space:nowrap">${escapeHtml(shortDate(t.due_date))}</td>` +
     `<td align="right" style="${cell}">${pill(label, tone)}</td></tr>`;
 }
@@ -296,7 +311,7 @@ function detailedItem(t: Task, today: string, tone: ToneName): string {
     ? `${prettyDate(t.due_date)}, ${overdueLabel(t.due_date, today)}`
     : prettyDate(t.due_date);
   rows.push(`<p ${L.row}><span ${L.lbl}>Due:</span> <span style="color:${TONE[tone].fg};font-weight:bold">${escapeHtml(when)}</span></p>`);
-  rows.push(`<p ${L.row}><span ${L.lbl}>Responsible:</span> ${escapeHtml(responsible(t, "Nobody assigned yet"))}` +
+  rows.push(`<p ${L.row}><span ${L.lbl}>Responsible:</span> ${responsibleHtml(t, "Nobody assigned yet")}` +
     (t.role?.member?.email ? ` (${escapeHtml(t.role.member.email)})` : "") + "</p>");
   if (t.estimated_cost != null) {
     rows.push(`<p ${L.row}><span ${L.lbl}>Estimated cost:</span> ${escapeHtml(money(t.estimated_cost))}</p>`);
@@ -306,7 +321,7 @@ function detailedItem(t: Task, today: string, tone: ToneName): string {
   }
   if (t.vendor) {
     const v = t.vendor;
-    const bits = [escapeHtml(v.name)];
+    const bits = [v.id ? a("vendor/" + v.id, escapeHtml(v.name), "text-decoration:underline") : escapeHtml(v.name)];
     const c = primaryContact(v);
     if (c.name) bits.push(escapeHtml(c.name));
     if (c.phone) bits.push(escapeHtml(c.phone));
@@ -328,7 +343,7 @@ function detailedItem(t: Task, today: string, tone: ToneName): string {
     (t.priority === "high" ? " " + pill("High priority", "overdue") : "");
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;margin:0 0 12px"><tr>` +
     `<td style="background:#ffffff;border:1px solid #cfd8e3;border-left:6px solid ${TONE[tone].fg};border-radius:10px;padding:14px 16px">` +
-    `<p style="font-size:17px;font-weight:bold;margin:0 0 8px;color:#16202b">${escapeHtml(t.title)}</p>` +
+    `<p style="font-size:17px;font-weight:bold;margin:0 0 8px;color:#16202b">${a("task/" + t.id, escapeHtml(t.title))}</p>` +
     `<p style="margin:0 0 8px">${badges}</p>` + rows.join("") + `</td></tr></table>`;
 }
 
@@ -356,18 +371,19 @@ export function buildDigest(
   // The logo is served by the site, since mail clients do not show SVG or
   // inline images reliably.
   const site = (opts.appUrl || DEFAULT_APP_URL).replace(/\/$/, "");
+  SITE = site;
   const header =
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>` +
-    `<td width="56" valign="middle"><img src="${escapeHtml(site)}/apple-touch-icon.png" width="48" height="48" alt="" style="display:block;border-radius:11px"></td>` +
-    `<td valign="middle" style="font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1;color:#16202b">372 <span style="color:#4a2f8f">12<span style="font-size:15px;vertical-align:top;letter-spacing:.03em">TH</span></span></td>` +
-    `<td valign="middle" align="right" style="font-size:14px;color:#47576a;line-height:1.4">Board summary<br><strong style="color:#16202b;font-size:16px">${escapeHtml(aheadName)}</strong></td>` +
+    `<td width="56" valign="middle">${a("", `<img src="${escapeHtml(site)}/apple-touch-icon.png" width="48" height="48" alt="372 12th" style="display:block;border:0;border-radius:11px">`)}</td>` +
+    `<td valign="middle" style="font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1;color:#16202b">${a("", `372 <span style="color:#4a2f8f">12<span style="font-size:15px;vertical-align:top;letter-spacing:.03em">TH</span></span>`)}</td>` +
+    `<td valign="middle" align="right" style="font-size:14px;color:#47576a;line-height:1.4">${a("dashboard", `Board summary<br><strong style="color:#16202b;font-size:16px">${escapeHtml(aheadName)}</strong>`)}</td>` +
     `</tr></table>`;
 
   const stats =
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0"><tr>` +
-    statTile(overdue.length, "Overdue", "overdue") + `<td width="2%"></td>` +
-    statTile(ahead.length, "Due in " + aheadMonth, "ahead") + `<td width="2%"></td>` +
-    statTile(after.length, "Due in " + afterMonth, "after") +
+    statTile(overdue.length, "Overdue", "overdue", "dashboard") + `<td width="2%"></td>` +
+    statTile(ahead.length, "Due in " + aheadMonth, "ahead", "tasks") + `<td width="2%"></td>` +
+    statTile(after.length, "Due in " + afterMonth, "after", "tasks") +
     `</tr></table>`;
 
   const listed: { t: Task; tone: ToneName; label: string }[] = [
@@ -386,14 +402,14 @@ export function buildDigest(
   const parts: string[] = [header, stats];
   const afterNum = (aheadStart.getUTCMonth() + 1) % 12 + 1;
   parts.push(scheduleTable(opts.schedules || [], aheadMonth, aheadStart.getUTCMonth() + 1, afterMonth, afterNum));
-  parts.push(`<h2 style="font-size:18px;margin:28px 0 12px;color:#16202b">Upcoming responsibilities</h2>`);
+  parts.push(`<h2 style="font-size:18px;margin:28px 0 12px;color:#16202b">${a("tasks", "Upcoming responsibilities")}</h2>`);
   parts.push(table);
   if (overdue.length) {
-    parts.push(sectionHead("Overdue", "overdue"));
+    parts.push(sectionHead("Overdue", "overdue", "dashboard"));
     parts.push(overdue.map((t) => detailedItem(t, today, "overdue")).join(""));
   }
   if (ahead.length) {
-    parts.push(sectionHead("Due in " + aheadName, "ahead"));
+    parts.push(sectionHead("Due in " + aheadName, "ahead", "tasks"));
     parts.push(ahead.map((t) => detailedItem(t, today, "ahead")).join(""));
   }
 
@@ -480,8 +496,8 @@ if (import.meta.main) {
       const { data, error } = await supabase
         .from("responsibilities")
         .select("id,title,description,due_date,priority,category,estimated_cost,last_completed_on," +
-                "role:board_roles(name,member:board_members(name,email))," +
-                "vendor:vendors(name,contact_name,email,phone,website," +
+                "role:board_roles(name,member:board_members(id,name,email))," +
+                "vendor:vendors(id,name,contact_name,email,phone,website," +
                 "vendor_contacts(name,email,phone,is_primary,position))," +
                 "links(title,url,sort_order)")
         // Active only. in_progress is a retired value that still counts as
@@ -496,7 +512,7 @@ if (import.meta.main) {
       // Not fatal. The email still goes out without the rotation table.
       const { data: sched } = await supabase
         .from("schedules")
-        .select("name,position,schedule_slots(label,responsible,month_start,month_end,position)");
+        .select("id,name,position,schedule_slots(label,responsible,month_start,month_end,position)");
       const schedules = (sched ?? []) as unknown as Schedule[];
 
       const appUrl = Deno.env.get("APP_URL") ?? null;

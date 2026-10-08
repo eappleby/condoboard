@@ -101,6 +101,10 @@
             <div class="card-list" id="list-done"></div>
           </section>
           <section class="dash-section">
+            <h2><span class="status-key status-key-ongoing">Ongoing</span></h2>
+            <div class="card-list" id="list-ongoing"></div>
+          </section>
+          <section class="dash-section">
             <h2><span class="status-key status-key-nodate">No date set</span></h2>
             <div class="card-list" id="list-nodate"></div>
           </section>
@@ -279,6 +283,7 @@
             <span>Repeats</span>
             <select class="input" id="tf-recurrence">
               <option value="none">Does not repeat</option>
+              <option value="ongoing">Ongoing</option>
               <option value="monthly">Monthly</option>
               <option value="quarterly">Quarterly</option>
               <option value="semiannual">Every 6 months</option>

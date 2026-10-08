@@ -134,7 +134,17 @@ the month after, such as the apartment on trash, then one
 table listing everything overdue, due in the month ahead and due in the
 month after, then overdue in full and the month ahead in full. The month
 after appears only in the table. Empty sections are left out, and there is
-no footer and no link back to the site, by Evan's choice.
+no footer, by Evan's choice.
+
+Everything in the email that names something on the site links to it,
+through `a(path, inner)` and `href(path)`, which build `APP_URL/#path` and
+keep the surrounding text's look. The logo and wordmark go to the home page,
+"Board summary" and the Overdue counter and heading to `#dashboard`, the
+month counters, the month heading and "Upcoming responsibilities" to
+`#tasks`, each responsibility to `#task/<id>`, each person to
+`#member/<id>`, each vendor to `#vendor/<id>`, and each schedule to
+`#schedule/<id>`. The query selects those ids for this. `SITE` is set at
+the top of `buildDigest()`.
 
 The look copies the site: the same red, amber and blue as the dashboard,
 status labels as pills, cards with a coloured left edge. `TONE` holds the
@@ -212,7 +222,11 @@ tab means testing widths again and probably raising it. `.tabs` is
 `nowrap` so a too-small breakpoint shows as horizontal overflow rather than a
 second row. The tabs exist twice in the markup, once in the top bar
 and once in the sidebar, and `showView()` keeps both copies in sync by
-`data-tab`. The logo and name in both places are a `.brand-home` link back to
+`data-tab`. `showView()` also writes the tab to the address as `#name`, and
+`route()` reads it on load and on `hashchange`: `#tasks` opens a tab, and
+`#task/<id>` (also vendor, account, member, role, fixture, schedule) opens
+the tab with that record's dialog on top. `ROUTES` maps each kind. The
+email's links depend on this, so keep the names stable. The logo and name in both places are a `.brand-home` link back to
 the dashboard. Escape closes a dialog first and only falls through to the
 sidebar when no dialog is open. The sidebar is unhidden before the `open`
 class is added on the next frame, otherwise the slide in animation does not
@@ -357,8 +371,11 @@ marks whoever is up this month. It handles ranges that wrap past December.
   inserted a new row each time.
 * The dashboard's Recently completed list therefore also shows open
   repeating items by `last_completed_on`.
-* Recurrence values are none, monthly, quarterly, semiannual, annual,
-  biennial, three_year, four_year, five_year. Adding one means updating the check
+* Recurrence values are none, ongoing, monthly, quarterly, semiannual,
+  annual, biennial, three_year, four_year, five_year. Ongoing is not a
+  cycle: `isOngoing()` items have no due date, show "Ongoing" in the Due
+  column, have no done button, get their own dashboard section, and end only
+  by being set to Complete or Canceled. `isRecurring()` is false for them. Adding a value means updating the check
   constraint, `RECUR_LABEL`, `RECUR_MONTHS`, and the select in `index.html`.
 * `[hidden] { display: none !important }` in style.css is what makes hiding
   work, since several classes set `display: flex`. Do not remove it.
@@ -370,7 +387,7 @@ marks whoever is up this month. It handles ranges that wrap past December.
   completion date and never overdue styling.
 * Items with no due date are a real and expected state, since several seeded
   rows are waiting on Evan to confirm a date. They get their own dashboard
-  bucket.
+  bucket, separate from ongoing items.
 
 ## Testing
 
