@@ -85,6 +85,8 @@ So:
   `checkAccess()`: no token, expired, wrong audience against `ACCESS_AUD`,
   wrong issuer against `ACCESS_TEAM_DOMAIN`, no matching key, or a bad
   signature. The site shows that text in its load error.
+  `ACCESS_TEAM_DOMAIN` may be the team name alone, which gets
+  `.cloudflareaccess.com` added, because that is what Evan entered first.
 
 ## Data model
 

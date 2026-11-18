@@ -233,7 +233,7 @@ project instead, which is Cloudflare's documented route.
    | --- | --- |
    | `SUPABASE_URL` | `https://YOUR_PROJECT_REF.supabase.co` |
    | `SUPABASE_SERVICE_ROLE_KEY` | the legacy service_role key |
-   | `ACCESS_TEAM_DOMAIN` | the team domain from step 3 |
+   | `ACCESS_TEAM_DOMAIN` | the team domain from step 3, or just the team name |
    | `ACCESS_AUD` | the AUD tag from step 1 |
 
 5. Set `USE_PROXY: true` in `config.js` and push. Sign in, check that

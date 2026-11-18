@@ -6,7 +6,8 @@
 // request that skipped Access, such as one to a preview address, is refused.
 //
 // Environment variables, set on the Pages project:
-//   ACCESS_TEAM_DOMAIN   for example yourteam.cloudflareaccess.com
+//   ACCESS_TEAM_DOMAIN   for example yourteam.cloudflareaccess.com, or just
+//                        the team name, yourteam
 //   ACCESS_AUD           the Application Audience (AUD) tag of the
 //                        Access application that protects the site
 
@@ -40,7 +41,9 @@ async function keys(team, fresh) {
  * mismatch can be fixed from the error alone.
  */
 export async function checkAccess(request, env) {
-  const team = String(env.ACCESS_TEAM_DOMAIN || "").trim().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  // Accepts the team name alone, such as 37212th, or the full team domain.
+  let team = String(env.ACCESS_TEAM_DOMAIN || "").trim().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  if (team && !team.includes(".")) team += ".cloudflareaccess.com";
   const aud = String(env.ACCESS_AUD || "").trim();
   if (!team || !aud) return { reason: "ACCESS_TEAM_DOMAIN or ACCESS_AUD is not set on the Pages project." };
 
