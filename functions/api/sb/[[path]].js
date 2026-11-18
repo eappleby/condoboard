@@ -12,7 +12,7 @@
 //   SUPABASE_SERVICE_ROLE_KEY   the service_role key. Keep it secret.
 //   ACCESS_TEAM_DOMAIN, ACCESS_AUD   see _access.js
 
-import { accessUser } from "../../_access.js";
+import { checkAccess } from "../../_access.js";
 
 const ALLOWED = [/^\/rest\/v1\//, /^\/storage\/v1\//, /^\/functions\/v1\/send-reminders$/];
 
@@ -29,8 +29,8 @@ export async function onRequest({ request, env, params }) {
   const key = env.SUPABASE_SERVICE_ROLE_KEY;
   if (!base || !key) return text(503, "The proxy is not set up. See README.md, Logins.");
 
-  const user = await accessUser(request, env);
-  if (!user) return text(403, "Sign in through Cloudflare Access.");
+  const access = await checkAccess(request, env);
+  if (!access.user) return text(403, "Sign in through Cloudflare Access. " + access.reason);
 
   const path = [].concat(params.path || []).join("/");
   if (/(^|\/)\.\.?(\/|$)|\\|%2e|%2f|%5c/i.test(path)) return text(404, "Not found.");

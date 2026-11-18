@@ -76,8 +76,15 @@ So:
   rest, so the site keeps working before the lockdown. The lockdown removes
   them. The two exceptions below never get one.
 * There is no site password. Evan removed the client side gate on
-  2026-11-17 once Access was the login. Do not bring it back, and do not add
-  a lock or sign out button.
+  2026-11-17 once Access was the login. Do not bring it back.
+* Sign out is a link to `/cdn-cgi/access/logout`, which ends the Access
+  session for the site. It sits at the right of the top bar and at the
+  bottom of the sidebar, and only shows when `USE_PROXY` is on, since that
+  is when Access is in front of the site. Evan asked for it.
+* When the proxy refuses a request it says which check failed, through
+  `checkAccess()`: no token, expired, wrong audience against `ACCESS_AUD`,
+  wrong issuer against `ACCESS_TEAM_DOMAIN`, no matching key, or a bad
+  signature. The site shows that text in its load error.
 
 ## Data model
 
@@ -254,12 +261,13 @@ script run with `node --experimental-strip-types`.
 
 ## Mobile navigation
 
-Below 1160px the top bar tabs are hidden and a hamburger opens a left
-sidebar. The top bar holds only the logo, the name and the tabs. Add
-responsibility lives on the Responsibilities toolbar, by Evan's choice. The
-breakpoint is set by how many tabs there are, not by a device size. Eight
-tabs and the logo stop fitting at about 1160px, so adding another tab means
-testing widths again and probably raising it. `.tabs` is `nowrap` so a too
+Below 1280px the top bar tabs are hidden and a hamburger opens a left
+sidebar. The top bar holds only the logo, the name, the tabs and Sign out.
+Add responsibility lives on the Responsibilities toolbar, by Evan's choice.
+The breakpoint is set by what the top bar holds, not by a device size. The
+logo, eight tabs and Sign out need about 1150px with the test fonts, and the
+breakpoint keeps a margin above that for wider system fonts, so adding a tab
+means testing widths again and probably raising it. `.tabs` is `nowrap` so a too
 small breakpoint shows as horizontal overflow rather than a second row. The
 tabs exist twice in the markup, once in the top bar and once in the sidebar,
 and `showView()` keeps both copies in sync by `data-tab`. `showView()` also

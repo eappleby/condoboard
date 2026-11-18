@@ -2110,7 +2110,7 @@
   $("menu-close").addEventListener("click", () => { closeSidebar(); $("menu-open").focus(); });
   $("sidebar-backdrop").addEventListener("click", () => { closeSidebar(); $("menu-open").focus(); });
   // Keep the sidebar from being left open and hidden when rotating to a wide screen.
-  window.addEventListener("resize", () => { if (window.innerWidth > 1160) closeSidebar(); });
+  window.addEventListener("resize", () => { if (window.innerWidth > 1280) closeSidebar(); });
 
   document.body.addEventListener("click", (e) => {
     const doneBtn = e.target.closest("[data-done]");
@@ -2193,6 +2193,9 @@
 
   function boot() {
     const name = CFG.BUILDING_NAME || "372 12th";
+    // Signing out ends the Cloudflare Access session, so the link only
+    // shows where Access is in front of the site.
+    document.querySelectorAll(".signout").forEach((a) => { a.hidden = !CFG.USE_PROXY; });
     $("brand-name").textContent = name;
     $("sidebar-brand").textContent = name;
     document.title = name;

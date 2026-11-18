@@ -242,6 +242,16 @@ project instead, which is Cloudflare's documented route.
 6. Run `supabase/lockdown.sql` in the Supabase SQL Editor. The anon key now
    opens nothing. The end of that file shows how to undo it.
 
+**Sign out**, at the right of the top bar or the bottom of the menu, ends
+the Access session.
+
+If the site cannot load and the error starts "Sign in through Cloudflare
+Access", the rest of the message names the check that failed. A wrong
+audience means `ACCESS_AUD` is not the tag of the `372 12th` application. A
+wrong issuer means `ACCESS_TEAM_DOMAIN` is not the team domain of the
+account that hosts the site. Fix the value with `wrangler pages secret put`
+and redeploy.
+
 The proxy refuses any request without a valid Access login, including
 requests to preview deployments, so a preview address shows no data.
 

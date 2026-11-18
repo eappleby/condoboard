@@ -33,35 +33,53 @@ async function keys(team, fresh) {
   return cache.keys;
 }
 
-/** The signed in person, as { email }, or null when the request did not pass Access. */
-export async function accessUser(request, env) {
+/**
+ * Checks the request's Access token. Returns { user: { email } } when it
+ * passes, or { reason } saying which check failed. The reason names the
+ * configured team domain and audience, neither of which is a secret, so a
+ * mismatch can be fixed from the error alone.
+ */
+export async function checkAccess(request, env) {
   const team = String(env.ACCESS_TEAM_DOMAIN || "").trim().replace(/^https?:\/\//, "").replace(/\/+$/, "");
   const aud = String(env.ACCESS_AUD || "").trim();
-  if (!team || !aud) return null;
+  if (!team || !aud) return { reason: "ACCESS_TEAM_DOMAIN or ACCESS_AUD is not set on the Pages project." };
 
   const token = request.headers.get("Cf-Access-Jwt-Assertion") || cookie(request, "CF_Authorization");
   const parts = token.split(".");
-  if (parts.length !== 3) return null;
+  if (parts.length !== 3) return { reason: "The request has no Access token." };
 
   let header, payload;
-  try { header = b64urlJson(parts[0]); payload = b64urlJson(parts[1]); } catch { return null; }
-  if (header.alg !== "RS256" || !header.kid) return null;
+  try { header = b64urlJson(parts[0]); payload = b64urlJson(parts[1]); }
+  catch { return { reason: "The Access token could not be read." }; }
+  if (header.alg !== "RS256" || !header.kid) return { reason: "The Access token is not signed with RS256." };
 
   const now = Date.now() / 1000;
-  if (typeof payload.exp !== "number" || payload.exp < now) return null;
-  if (typeof payload.nbf === "number" && payload.nbf > now + 60) return null;
+  if (typeof payload.exp !== "number" || payload.exp < now) return { reason: "The Access token has expired. Reload the page." };
+  if (typeof payload.nbf === "number" && payload.nbf > now + 60) return { reason: "The Access token is not valid yet." };
   const auds = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-  if (!auds.includes(aud)) return null;
-  if (payload.iss !== "https://" + team) return null;
+  if (!auds.includes(aud)) {
+    return { reason: "The token is for audience " + auds.join(", ") + ", but ACCESS_AUD is " + aud + "." };
+  }
+  if (payload.iss !== "https://" + team) {
+    return { reason: "The token was issued by " + payload.iss + ", but ACCESS_TEAM_DOMAIN is " + team + "." };
+  }
 
-  let jwk = (await keys(team, false)).find((k) => k.kid === header.kid);
-  if (!jwk) jwk = (await keys(team, true)).find((k) => k.kid === header.kid);
-  if (!jwk) return null;
+  let jwk;
+  try {
+    jwk = (await keys(team, false)).find((k) => k.kid === header.kid);
+    if (!jwk) jwk = (await keys(team, true)).find((k) => k.kid === header.kid);
+  } catch { return { reason: "Could not fetch the Access keys from https://" + team + "/cdn-cgi/access/certs." }; }
+  if (!jwk) return { reason: "No Access key matches the token." };
 
   const key = await crypto.subtle.importKey(
     "jwk", { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: "RS256", ext: true },
     { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
   const ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key,
     b64urlBytes(parts[2]), new TextEncoder().encode(parts[0] + "." + parts[1]));
-  return ok ? { email: String(payload.email || "") } : null;
+  return ok ? { user: { email: String(payload.email || "") } } : { reason: "The Access token signature does not match." };
+}
+
+/** The signed in person, as { email }, or null when the request did not pass Access. */
+export async function accessUser(request, env) {
+  return (await checkAccess(request, env)).user || null;
 }
