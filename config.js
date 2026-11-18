@@ -15,5 +15,5 @@ window.CONDOBOARD_CONFIG = {
   // Set to true once Cloudflare Access and the Pages environment variables
   // are in place (README.md, "Logins"). The site then reaches Supabase
   // through /api/sb, and account passwords appear.
-  USE_PROXY: false,
+  USE_PROXY: true,
 };
