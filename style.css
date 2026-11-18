@@ -61,29 +61,6 @@ body {
 }
 .skip-link:focus { left: 0; }
 
-/* ---------- password gate ---------- */
-.gate {
-  position: fixed; inset: 0; z-index: 500; background: var(--bg);
-  display: flex; align-items: center; justify-content: center; padding: 24px;
-}
-.gate-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: var(--shadow);
-  padding: 32px 30px;
-  width: 100%; max-width: 400px;
-  display: flex; flex-direction: column; gap: 16px;
-}
-.gate-card h1 { margin: 0; font-size: 24px; text-align: center; }
-.gate-sub { margin: 0; color: var(--text-soft); text-align: center; }
-.gate-err {
-  margin: 0; color: var(--red); font-weight: 600;
-  background: var(--red-soft); border: 1px solid #f0c3c0;
-  border-radius: 8px; padding: 10px 12px;
-}
-body.locked > .topbar, body.locked > .container, body.locked > .demo-banner { display: none; }
-
 .checkbox-row { display: flex; align-items: center; gap: 10px; font-size: 15px; color: var(--text-soft); }
 .checkbox-row input { width: 20px; height: 20px; margin: 0; accent-color: var(--primary); }
 
@@ -105,7 +82,6 @@ body.locked > .topbar, body.locked > .container, body.locked > .demo-banner { di
 .brand { font-weight: 700; font-size: 20px; white-space: nowrap; display: flex; align-items: center; gap: 10px; }
 .brand img { display: block; border-radius: 8px; }
 .brand-home { color: inherit; text-decoration: none; border-radius: 8px; }
-.gate-logo { display: block; margin: 0 auto; border-radius: 18px; }
 
 /* The logo and eight tabs have to fit on one line. Below the breakpoint they move into
    the sidebar instead of wrapping. */

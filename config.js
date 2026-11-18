@@ -12,12 +12,6 @@ window.CONDOBOARD_CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndubXZlaHphdG5jbGhvZ2lobG54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNDQ3ODMsImV4cCI6MjEwMzcyMDc4M30.H_sdBIfaOiF5V0IdCl_e_nB2i1rH_TTHBAXIsil54As",  // the long "anon public" key
   BUILDING_NAME: "372 12th",  // shown in the header
 
-  // Password screen shown before the app loads. Set to "" to turn it off.
-  // Note: this keeps casual visitors out if the link gets shared around, but
-  // but it is not real security. The password is readable in this file,
-  // which the browser downloads. See the Security section of README.md.
-  SITE_PASSWORD: "essex",
-
   // Set to true once Cloudflare Access and the Pages environment variables
   // are in place (README.md, "Logins"). The site then reaches Supabase
   // through /api/sb, and account passwords appear.

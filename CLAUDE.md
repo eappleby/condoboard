@@ -52,8 +52,7 @@ and replies in chat:
   `S` and patches it after each successful store call. **Stores must not
   mutate `S`.** A demo store that also pushed rows caused double inserts
   once.
-* `store` is created lazily through `getStore()` so nothing is fetched before
-  the password gate is passed. Keep it that way.
+* `store` is created lazily through `getStore()` on first use.
 
 ## Logins, the proxy and the lockdown
 
@@ -76,11 +75,9 @@ So:
 * New tables still get an "open access" policy in their migration, like the
   rest, so the site keeps working before the lockdown. The lockdown removes
   them. The two exceptions below never get one.
-* The password gate is still there, client side, a djb2 hash of the
-  lowercased password in `localStorage` or `sessionStorage`, trimmed and case
-  insensitive. Once Access is on it is a second login and can be turned off
-  by setting `SITE_PASSWORD` to "". There is no lock button, by Evan's
-  request. Never describe the gate as securing the data.
+* There is no site password. Evan removed the client side gate on
+  2026-11-17 once Access was the login. Do not bring it back, and do not add
+  a lock or sign out button.
 
 ## Data model
 
@@ -473,10 +470,10 @@ The apartment is stored as a bare number, since "Apt" is implied, and
 ## Testing
 
 Serve locally with `python3 -m http.server` and drive demo mode with
-Playwright. Automated tests must pass the gate first. In demo mode a reload
+Playwright. In demo mode a reload
 resets the data, so move between tabs by clicking them.
 
-Worth repeating after changes: the gate, add, edit and delete for every
+Worth repeating after changes: add, edit and delete for every
 record type including roles and residents, Mark done on a recurring item
 (row count unchanged, still active, and the next date is right), each status
 filter view including which of the badge and done button show, reassigning

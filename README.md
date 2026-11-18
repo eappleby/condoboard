@@ -21,7 +21,7 @@ Everything runs on free tiers:
 | File | Purpose |
 | --- | --- |
 | `index.html`, `style.css`, `app.js` | The whole web app. No build step. |
-| `config.js` | Supabase address and key, building name, site password, proxy switch. |
+| `config.js` | Supabase address and key, building name, proxy switch. |
 | `logo.svg`, `favicon.svg`, `favicon.png`, `apple-touch-icon.png` | The logo and its browser tab versions. |
 | `functions/api/sb/[[path]].js` | Pages Function. The site's way into Supabase once logins are on. It checks the Access login and adds the service key. |
 | `functions/mute.js` | Pages Function. The "stop these reminders" page that every notice links to. |
@@ -181,7 +181,6 @@ window.CONDOBOARD_CONFIG = {
   SUPABASE_URL: "https://YOUR_PROJECT_REF.supabase.co",
   SUPABASE_ANON_KEY: "the long anon public key",
   BUILDING_NAME: "372 12th",
-  SITE_PASSWORD: "essex",
   USE_PROXY: false,
 };
 ```
@@ -243,9 +242,6 @@ project instead, which is Cloudflare's documented route.
 6. Run `supabase/lockdown.sql` in the Supabase SQL Editor. The anon key now
    opens nothing. The end of that file shows how to undo it.
 
-Once this is done the site password in `config.js` is a second login on top
-of Access, and can be set to `""`.
-
 The proxy refuses any request without a valid Access login, including
 requests to preview deployments, so a preview address shows no data.
 
@@ -302,8 +298,7 @@ function hold the service key. The mute page is the one public page, and it
 can only switch off the one reminder its link names.
 
 Before that is done, the database is open to anyone who has the site
-address, because the anon key is in `config.js`. The site password is a
-doorstop that stops a forwarded link, not a lock. That is why passwords live
+address, because the anon key is in `config.js`. That is why passwords live
 in `account_secrets`, a table the anon key has never been able to read, and
 why the password field only appears with the proxy on.
 

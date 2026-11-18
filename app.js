@@ -207,7 +207,7 @@
   // Passwords are only shown and saved where the anon key is not in use.
   const secretsAvailable = demoMode || !!CFG.USE_PROXY;
 
-  // Built lazily so nothing is fetched before the password gate is passed.
+  // Built lazily, on first use.
   let store = null;
   function getStore() {
     if (!store) store = demoMode ? makeDemoStore() : makeSupabaseStore();
@@ -2162,48 +2162,6 @@
     $(id).addEventListener("input", renderTaskTable));
 
   // ------------------------------------------------------------------
-  // Password gate.
-  //
-  // A doorstop, not a lock: the password lives in config.js, which every
-  // visitor's browser downloads. It stops a stray link from being walked
-  // into. It does not stop anyone determined. See the README.
-  // ------------------------------------------------------------------
-  const PASSWORD = (CFG.SITE_PASSWORD || "").trim();
-  const UNLOCK_KEY = "condoboard-unlock";
-
-  function token(pw) {
-    let h = 5381;
-    for (let i = 0; i < pw.length; i++) h = ((h << 5) + h + pw.charCodeAt(i)) >>> 0;
-    return "v1-" + h.toString(36);
-  }
-  function safeGet(storage, key) {
-    try { return storage.getItem(key); } catch (e) { return null; }
-  }
-  function isUnlocked() {
-    const want = token(PASSWORD.toLowerCase());
-    return safeGet(localStorage, UNLOCK_KEY) === want || safeGet(sessionStorage, UNLOCK_KEY) === want;
-  }
-  function rememberUnlock(persist) {
-    try { (persist ? localStorage : sessionStorage).setItem(UNLOCK_KEY, token(PASSWORD.toLowerCase())); }
-    catch (e) { /* private browsing */ }
-  }
-
-  $("gate-form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    if ($("gate-input").value.trim().toLowerCase() !== PASSWORD.toLowerCase()) {
-      $("gate-err").hidden = false;
-      $("gate-input").value = "";
-      $("gate-input").focus();
-      return;
-    }
-    rememberUnlock($("gate-remember").checked);
-    $("gate-err").hidden = true;
-    $("gate").hidden = true;
-    document.body.classList.remove("locked");
-    start();
-  });
-
-  // ------------------------------------------------------------------
   // Boot
   // ------------------------------------------------------------------
   async function start() {
@@ -2237,15 +2195,8 @@
     const name = CFG.BUILDING_NAME || "372 12th";
     $("brand-name").textContent = name;
     $("sidebar-brand").textContent = name;
-    $("gate-title").textContent = name;
     document.title = name;
-    if (PASSWORD && !isUnlocked()) {
-      document.body.classList.add("locked");
-      $("gate").hidden = false;
-      $("gate-input").focus();
-    } else {
-      start();
-    }
+    start();
   }
   boot();
 })();
