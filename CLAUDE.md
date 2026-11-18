@@ -218,7 +218,10 @@ Enable access policy, then edited to drop the `*` subdomain. README.md,
 `?dry=1&kind=summary|due|schedule` returns the built email, HTML included,
 and never sends or records. When nothing of that kind goes out today it
 builds the next one, through `nextNoticeDate()` or `nextScheduleDay()`, and
-says so in `note`. `?force=1` sends the summary now. Both need the service
+says so in `note`. When none is coming, it builds a sample from real rows
+through `sampleDueNotice()` and `sampleScheduleReminder()`, and `note` says
+it is a sample and whether that kind is switched off. A preview must always
+show an email: Evan found blank previews while the switches were off. `?force=1` sends the summary now. Both need the service
 key once the lockdown has run: `mayPreview()` accepts the service key or a
 service role JWT, and otherwise only allows them while the anon key can
 still read `reminder_settings`. The proxy supplies the service key. **A

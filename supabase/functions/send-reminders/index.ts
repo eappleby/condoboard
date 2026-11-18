@@ -27,7 +27,9 @@
 //   ?dry=1&kind=summary|due|schedule   Build the email and return it without
 //                                      sending or recording anything. When
 //                                      nothing of that kind goes out today,
-//                                      the next one is shown.
+//                                      the next one is shown, and when none
+//                                      is coming, a sample made from real
+//                                      rows. It ignores every switch.
 //   ?force=1                           Send the monthly summary now.
 // Both need the service key once supabase/lockdown.sql has run. The site's
 // proxy supplies it after checking the Cloudflare Access login.
@@ -719,6 +721,47 @@ export function nextScheduleDay(schedules: Schedule[], today: string): { day: st
 }
 
 // ---------------------------------------------------------------------------
+// Samples, so a preview always has something to show. Built from real rows
+// as if they were set up to send, and never sent.
+// ---------------------------------------------------------------------------
+
+/** A due notice for the next dated active item, as if it sent reminders. */
+export function sampleDueNotice(tasks: Task[], today: string, opts: { appUrl?: string | null }): { msg: Message; title: string } | null {
+  const dated = tasks.filter((t) => t.due_date).slice().sort((a, b) => a.due_date.localeCompare(b.due_date));
+  const t = dated.find((x) => x.due_date >= today) || dated[dated.length - 1];
+  if (!t) return null;
+  const member = t.role?.member;
+  const copy: Task = {
+    ...t,
+    send_reminders: true,
+    role: {
+      name: t.role?.name || "Unassigned",
+      member: { id: member?.id, name: member?.name || "", email: (member?.email || "").trim() || "the role holder" },
+    },
+  };
+  const day = nextNoticeDate(t.due_date, today);
+  const msg = buildDueNotices([copy], day, { appUrl: opts.appUrl })[0];
+  return msg ? { msg, title: t.title } : null;
+}
+
+/** A schedule reminder for the row whose turn comes soonest, as if it had someone on it. */
+export function sampleScheduleReminder(schedules: Schedule[], today: string, opts: { appUrl?: string | null }): Message | null {
+  for (let i = 0; i <= 366; i++) {
+    const day = addDays(today, i);
+    for (const sc of schedules.slice().sort((a, b) => (a.position || 0) - (b.position || 0))) {
+      const slot = sortedSlots(sc).find((s) => coveringRange(s, day));
+      if (!slot) continue;
+      const person: SlotPerson = peopleOf(slot)[0] || {
+        id: "sample", muted: false, mute_token: "00000000-0000-0000-0000-000000000000", member: null,
+      };
+      const named = { ...person, member: { name: person.member?.name || "", email: person.member?.email || "the person on this row" } };
+      return buildScheduleReminder({ sc, slot, person: named }, day, opts);
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Sending
 // ---------------------------------------------------------------------------
 
@@ -837,9 +880,14 @@ if (import.meta.main) {
               messages = buildDueNotices(tasks, next, { appUrl });
               note = `Nothing goes out today. The next notice goes out ${prettyDate(next)}.`;
             } else {
-              note = "No active responsibility sends reminders and has a role holder with an email.";
+              const sample = sampleDueNotice(tasks, today, { appUrl });
+              if (sample) messages = [sample.msg];
+              note = sample
+                ? `No responsibility with a role holder's email has reminder emails turned on, so this is a sample made from ${sample.title}.`
+                : "There is no active responsibility with a due date to make a sample from.";
             }
           }
+          if (!settings.due_notices_enabled) note = (note + " Due notices are off, so nothing is sent.").trim();
         } else if (kind === "schedule") {
           const items = scheduleItems(schedules, today, local.weekday, null);
           let day = today;
@@ -847,15 +895,23 @@ if (import.meta.main) {
           if (!items.length) {
             const next = nextScheduleDay(schedules, today);
             if (next) { day = next.day; found = next.items; note = `Nothing goes out today. The next reminder goes out ${prettyDate(day)}.`; }
-            else note = "No schedule reminder goes out in the next two weeks.";
           }
           messages = found.map((it) => buildScheduleReminder(it, day, { appUrl }));
+          if (!messages.length) {
+            const sample = sampleScheduleReminder(schedules, today, { appUrl });
+            if (sample) messages = [sample];
+            note = sample
+              ? "No reminder goes out in the next two weeks, so this is a sample. Check the days, time and people on each schedule."
+              : "There is no schedule row with dates to make a sample from.";
+          }
+          if (!settings.schedule_reminders_enabled) note = (note + " Schedule reminders are off, so nothing is sent.").trim();
         } else {
           messages = buildMessages(summaryTasks, settings, digestOpts);
           if (!messages.length) {
             const d = buildDigest(summaryTasks, digestOpts);
             messages = [{ to: "no address set", subject: d.subject, html: d.html }];
           }
+          if (!settings.reminders_enabled) note = "The monthly summary is set to Never, so nothing is sent.";
         }
         return json({
           preview: true,

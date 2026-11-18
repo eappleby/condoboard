@@ -118,7 +118,10 @@ responsibility, or the Emails box next to the person on the schedule row.
 Mail apps that offer a one click unsubscribe use the same page.
 
 **Preview** never sends, and works whatever the switches say. When nothing
-of that kind goes out today, it shows the next one and says when. **Send it
+of that kind goes out today, it shows the next one and says when. When none
+is coming at all, because nothing is set to send reminders or no one is on a
+schedule row, it shows a sample made from a real responsibility or schedule
+row and says so. **Send it
 now** sends the monthly summary immediately.
 
 The summary's recipient is set by migration rather than on the site. To
