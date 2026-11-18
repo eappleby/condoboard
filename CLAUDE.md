@@ -3,14 +3,15 @@
 ## What this is
 
 The 372 12th condo board's responsibility tracker. Static site with no build
-step and no framework, plus Supabase for the database and the reminder
-emails. Hosted on Cloudflare Pages. Everything sits on free tiers. The full
-setup guide is in README.md.
+step and no framework, two Cloudflare Pages Functions, Supabase for the
+database and the email function, and CloudMailin to deliver mail. Hosted on
+Cloudflare Pages behind Cloudflare Access. Everything sits on free tiers. The
+full setup guide is in README.md.
 
 ## House style, set by Evan
 
-These are not suggestions. Apply them to UI copy, seeded data, docs, and
-replies in chat:
+These are not suggestions. Apply them to UI copy, seeded data, docs, emails,
+and replies in chat:
 
 * **No emojis anywhere.** Not in the interface, not in data, not in the
   favicon. Use words or plain SVG instead.
@@ -38,47 +39,88 @@ replies in chat:
   tested without a database. **Never overwrite Evan's `config.js` from the
   container**, because it holds the real Supabase key. Patch it in place on
   the device instead.
+* `USE_PROXY` in `config.js` sends every Supabase request through
+  `functions/api/sb/[[path]].js` instead of to supabase.co. `apiBase()` in
+  `app.js` picks the address, for the store, the email function and the
+  storage URL. `upload()` rewrites the returned picture address back to the
+  real Supabase address, so saved addresses do not depend on the proxy.
 * `app.js` uses a `store` abstraction with two implementations,
   `makeDemoStore` and `makeSupabaseStore`, sharing
-  `load / insert / update / remove(kind, ...)` and `upload(bucket, file)` where kind is a key of `TABLE`,
-  such as members, roles, vendors, tasks, links, accounts. The UI holds all state in `S` and patches
-  it after each successful store call. **Stores must not mutate `S`.** A demo
-  store that also pushed rows caused double inserts once.
+  `load / insert / update / upsert / remove(kind, ...)` and
+  `upload(bucket, file)` where kind is a key of `TABLE`, such as members,
+  roles, vendors, tasks, links, accounts, secrets. The UI holds all state in
+  `S` and patches it after each successful store call. **Stores must not
+  mutate `S`.** A demo store that also pushed rows caused double inserts
+  once.
 * `store` is created lazily through `getStore()` so nothing is fetched before
   the password gate is passed. Keep it that way.
+
+## Logins, the proxy and the lockdown
+
+Cloudflare Access is the real login. It alone does not protect the data,
+because the Supabase address and anon key would still work from anywhere.
+So:
+
+* `functions/api/sb/[[path]].js` checks the Access token through
+  `accessUser()` in `functions/_access.js`, which verifies the RS256
+  signature against the team's certs, the audience, the issuer and the
+  expiry. It then forwards to Supabase with the service key, dropping the
+  browser's own `apikey`, `Authorization`, cookies and `cf-` headers. Only
+  `/rest/v1/`, `/storage/v1/` and `/functions/v1/send-reminders` pass, and
+  any `..` or encoded slash is refused. It refuses everything when its
+  environment variables are missing. Never let it fall open.
+* `supabase/lockdown.sql` drops every "open access" policy in public and the
+  anon storage policies. It is deliberately not a migration: a push applies
+  migrations to production at once, and the site breaks if this runs before
+  the proxy is in use. README.md, "Logins", has the order.
+* New tables still get an "open access" policy in their migration, like the
+  rest, so the site keeps working before the lockdown. The lockdown removes
+  them. The two exceptions below never get one.
+* The password gate is still there, client side, a djb2 hash of the
+  lowercased password in `localStorage` or `sessionStorage`, trimmed and case
+  insensitive. Once Access is on it is a second login and can be turned off
+  by setting `SITE_PASSWORD` to "". There is no lock button, by Evan's
+  request. Never describe the gate as securing the data.
 
 ## Data model
 
 Tables: `board_members`, `board_roles`, `vendors`, `vendor_contacts`,
-`responsibilities`,
-`links`, `accounts`, `reminder_settings`, `schedules`, `schedule_slots`,
-`fixtures`. A link belongs
+`responsibilities`, `links`, `accounts`, `account_secrets`,
+`reminder_settings`, `notifications_sent`, `schedules`, `schedule_slots`,
+`schedule_slot_ranges`, `schedule_slot_people`, `fixtures`. A link belongs
 to exactly one of a responsibility, a vendor, an account, or a fixture, and
 carries a `sort_order` so the board can arrange documents by hand. Adding a
 new owner type means a column on `links`, a branch in `linksFor()`, and the
 new key in the row built by `saveLinks()`.
-RLS is on with wide open policies for `anon`, which is deliberate given there
-is no per person login.
+
+`board_members` holds everyone. `on_board` false makes a person a resident:
+shown in the Residents group on the Board tab, offered on schedule rows, but
+never in the role holder select or the Responsibilities person filter.
+`boardMembers()` and `onBoard()` are the filters. Turning someone into a
+resident vacates their roles.
 
 A responsibility points at a role through `role_id`, and a role points at
 whoever holds it through `board_roles.member_id`. Nothing assigns a
 responsibility to a person directly, which is the point: when the board
 changes, only the role holder is edited. `responsibilities.assignee_id` and
 `board_members.position` are dead columns kept for compatibility. Do not
-read or write them. `rolesOf()`, `tasksOfMember()` and `memberOfTask()` resolve a person to
-their responsibilities, and the email function joins
-`role:board_roles(name,member:board_members(name,email))`.
+read or write them. `rolesOf()`, `tasksOfMember()` and `memberOfTask()`
+resolve a person to their responsibilities, and the email function joins
+`role:board_roles(name,member:board_members(id,name,email))`.
+
+`responsibilities.send_reminders` turns due notices on for one item, and is
+off by default because many items need nothing done. It is disabled in the
+dialog for ongoing items. `mute_token` is the secret in the notice's mute
+link.
 
 A vendor's people live in `vendor_contacts`: name, an optional label such
-as Billing, email, optional phone,
-`is_primary` and `position`. `vendors.contact_name`, `vendors.email` and
-`vendors.phone` are dead columns kept for compatibility. `contactEditor`
-in the vendor modal keeps exactly one primary while any contact exists,
-drops rows with no name, and `saveContacts()` writes them. Only the name is
-enforced, because the rows carried over from the old columns do not all have
-an email. `contactsFor()` lists the primary first. The email shows a
-vendor's primary contact through `primaryContact()`, falling back to the old
-columns for a vendor with no contacts.
+as Billing, email, optional phone, `is_primary` and `position`.
+`vendors.contact_name`, `vendors.email` and `vendors.phone` are dead columns
+kept for compatibility. `contactEditor` in the vendor modal keeps exactly
+one primary while any contact exists, drops rows with no name, and
+`saveContacts()` writes them. Only the name is enforced. `contactsFor()`
+lists the primary first. The email shows a vendor's primary contact through
+`primaryContact()`, falling back to the old columns.
 
 A responsibility can also point at the account or city portal it is done
 through, with `responsibilities.account_id`, chosen in its dialog next to
@@ -86,25 +128,19 @@ Status. On the Responsibilities table, `refLinks()` names the vendor and
 account under the title as `#vendor/<id>` and `#account/<id>` links, which
 `route()` turns into that record's dialog. Deleting an account clears it.
 
-`accounts` has no password column and must not get one. The database is
-readable by anyone with the site address, so credentials live in the board
-password manager. The same reasoning excluded the camera stream host, port
-and credentials from the seeded data.
+**Passwords live in `account_secrets`, never in `accounts`.** It has row
+level security on, no policy and no grants for anon or authenticated, from
+the migration that created it, so the anon key could never read it even
+before the lockdown. Never add a policy for anon there. The site only
+reaches it through the proxy, so `secretsAvailable` (demo mode or
+`USE_PROXY`) decides whether the password field shows at all. The field is
+`type=password` until the eye button is pressed, and resets to hidden each
+time the dialog opens. `saveSecret()` upserts only when the value changed.
+The camera stream host, port and credentials are still kept out of seeded
+data.
 
-## Password gate
-
-Client side only, by Evan's choice. A doorstop against a forwarded link, not
-real security, since the password and the anon key are both in the downloaded
-source. Do not describe it to him as if it secures the data.
-
-* Unlock token is a djb2 hash of the lowercased password, kept in
-  `localStorage` for "remember me" or `sessionStorage` otherwise. All storage
-  access is wrapped in try/catch because private mode throws.
-* Comparison is trimmed and case insensitive on purpose, since people retype
-  it from a text message.
-* There is no lock button. Evan asked for it to be removed.
-* The real upgrade path is Cloudflare Access, free for 50 users, no app
-  changes.
+`notifications_sent` is read and written only by the email function, so it
+also has no policy.
 
 ## Migrations
 
@@ -114,10 +150,11 @@ the dashboard GitHub integration with "Deploy to production" enabled.
 * **Never edit an applied migration.** Add a new timestamped one. The project
   is linked and pushed, so assume everything already ran.
 * Data migrations must be re-runnable. The existing ones use anti joins on a
-  natural key, so replays never duplicate rows and never resurrect rows
-  deleted in the app.
-* `supabase/reminders-cron.sql` is intentionally not a migration, since it
-  embeds the project ref and anon key and runs once.
+  natural key, or only touch rows that have nothing yet, so replays never
+  duplicate rows and never resurrect rows deleted in the app.
+* `supabase/reminders-cron.sql` and `supabase/lockdown.sql` are
+  intentionally not migrations. The cron file embeds the project ref and
+  anon key, and the lockdown must wait for the proxy.
 * The first two migrations still contain em dashes in comments and in starter
   rows that a later migration deletes. They are applied, so they are left
   alone rather than edited.
@@ -126,121 +163,118 @@ Pricing, checked 2026-08-31: deploying from GitHub to production is free on
 any plan. Preview branches are Pro only at $0.01344 per branch per hour. Do
 not enable branching without flagging the cost.
 
-## The monthly summary email
+## The emails
 
-`buildDigest()` and `buildMessages()` are pure on purpose, so the email
-content can be tested with Deno without touching the network. Run
-`deno run --allow-read --allow-net --allow-env` against a script that imports
-them. The `Deno.serve` call is guarded by `import.meta.main`, so importing
-the module in a test does not start a server.
+One Edge Function, `supabase/functions/send-reminders/index.ts`, sends all
+of them through CloudMailin's API,
+`https://api.cloudmailin.com/api/v0.1/<username>/messages` with the API key
+as a Bearer token. The sender defaults to
+`372 Board <372board@forourschool.org>`. Secrets: `CLOUDMAILIN_USERNAME`,
+`CLOUDMAILIN_API_KEY`, `FROM_EMAIL`, `APP_URL`. Resend is gone.
 
-Structure: a header with the logo, the name and three counters, then a
-Schedules table naming who is up for each rotation in the month ahead and
-the month after, such as the apartment on trash, then one
-table listing everything overdue, due in the month ahead and due in the
-month after, then "Coming up later", the `LATER_MONTHS` (six) months after
-that, as name, person and date. There are no detail cards: Evan found them
-a repeat of the table, so the email stays a set of short lists and the
-details live on the site, one click away. Empty sections are left out, and
-there is no footer, by Evan's choice. The query only selects what those
-lists show, so adding a detail back means adding it to the select too.
+The cron in `reminders-cron.sql` runs hourly. `localParts()` turns the
+moment into the New York date, hour and weekday, and the builders receive
+that date at midnight UTC, so their UTC getters read the New York date.
+That is what keeps 7AM at 7AM through daylight saving time. Do not go back
+to a daily cron at a fixed UTC hour.
 
-Everything in the email that names something on the site links to it,
-through `a(path, inner)` and `href(path)`, which build `APP_URL/#path` and
-keep the surrounding text's look. The logo and wordmark go to the home page,
-"Board summary" and the Overdue counter and heading to `#dashboard`, the
-month counters, the month heading and "Upcoming responsibilities" to
-`#tasks`, each responsibility to `#task/<id>`, each person to
-`#member/<id>`, each vendor to `#vendor/<id>`, and each schedule to
-`#schedule/<id>`. The query selects those ids for this. `SITE` is set at
-the top of `buildDigest()`.
+* **Monthly summary.** At `SUMMARY_HOUR` (9) on `send_day_of_month` when
+  `reminders_enabled`. `last_sent_at`, compared on the New York date, stops
+  a second send.
+* **Due notices.** At `NOTICE_HOUR` (9) when `due_notices_enabled`.
+  `noticeKind()` gives 7 days before, the due date, and every 7 days after.
+  `buildDueNotices()` groups by the holder's email, so one email can list
+  several items, each with its own mute link.
+* **Schedule reminders.** When `schedule_reminders_enabled`, for every
+  schedule whose `remind_days` include today's weekday and whose
+  `remind_hour` is this hour. `scheduleItems()` finds the people on rows
+  covering today, leaving out muted people and people with no email.
+  `buildScheduleReminder()` sends one email per person.
 
-The look copies the site: the same red, amber and blue as the dashboard,
-status labels as pills, cards with a coloured left edge. `TONE` holds the
-colours, so change them there if `style.css` changes. Layout is tables with
-inline styles because mail clients ignore stylesheets. The logo is an `img`
-pointing at `apple-touch-icon.png` on the site, since mail clients do not
-render SVG, so it needs the site to be deployed. `APP_URL` sets the site
-address and falls back to `DEFAULT_APP_URL`.
+Notices and schedule reminders are recorded in `notifications_sent` keyed by
+kind, row id, recipient and date, and checked before sending, so a retried
+or repeated hour never sends twice.
 
-There is no Deno in the container. To test, copy `index.ts` without the
-`npm:` import line and import `buildDigest` from a script run with
-`node --experimental-strip-types`.
+Mute links go to `APP_URL/mute?t=<token>`. `functions/mute.js` looks the
+token up in `responsibilities.mute_token` and then
+`schedule_slot_people.mute_token`, shows the current state and one button,
+and flips `send_reminders` or `muted`. A GET never changes anything, because
+mail scanners open links. A POST with `List-Unsubscribe=One-Click` mutes
+directly, and single item emails carry `List-Unsubscribe` headers for it.
+`/mute` is the one path behind an Access Bypass application, since residents
+have no login. The email logo is `/mute/logo.png`, a copy of
+`apple-touch-icon.png`, so that one bypass covers it too: Access applies a
+path's rule to the paths under it. `pages.dev` is not a zone in the
+account, so Access applications for it are made from the Pages project's
+Enable access policy, then edited to drop the `*` subdomain. README.md,
+"Logins", has the steps.
 
-The Schedules table comes from `schedules` and `schedule_slots`, passed to
-`buildDigest()` as `opts.schedules`. `slotFor()` repeats the site's
-`isCurrentSlot()` rule, so keep the two in step. A schedule with no slot for
-either month is left out, and a failed schedules query does not stop the
-email.
+`?dry=1&kind=summary|due|schedule` returns the built email, HTML included,
+and never sends or records. When nothing of that kind goes out today it
+builds the next one, through `nextNoticeDate()` or `nextScheduleDay()`, and
+says so in `note`. `?force=1` sends the summary now. Both need the service
+key once the lockdown has run: `mayPreview()` accepts the service key or a
+service role JWT, and otherwise only allows them while the anon key can
+still read `reminder_settings`. The proxy supplies the service key. **A
+preview must never be gated by the send checks.** The switches, the hour and
+the already sent guards decide whether to SEND, and `dry` skips them all.
 
-`coveredMonths()` decides which months those are, and `laterEnd` for the
-later list. On or before
-the 20th the detailed month is the current one, from the 21st it rolls to the
-next. It handles the year boundary. If that rule changes, change the wording
-on the Notifications tab and in README.md too, since both explain it.
+The summary's structure: a header with the logo, the name and three
+counters, then a Schedules table naming the rows that touch the month ahead
+and the month after, through `slotsInMonth()`, as apartment and people with
+the period under it, then one table listing everything overdue, due in the
+month ahead and due in the month after, then "Coming up later", the
+`LATER_MONTHS` (six) months after that. There are no detail cards, Evan
+found them a repeat of the table. Empty sections are left out, and there is
+no footer, by Evan's choice. On or before the 20th the detailed month is the
+current one, from the 21st it rolls to the next, through `coveredMonths()`.
+If that rule changes, change README.md too.
 
-`days_ahead` and `cooldown_days` are dead columns. The email is month based
-now, and a monthly summary should repeat an open item rather than suppress
-it. The columns stay for compatibility but nothing reads them, and the
-Notifications tab no longer offers them.
+Everything in an email that names something on the site links to it,
+through `a(path, inner)` and `href(path)`, which build `APP_URL/#path`:
+the logo to the home page, counters to `#dashboard` or `#tasks`, each
+responsibility to `#task/<id>`, each person to `#member/<id>`, each schedule
+to `#schedule/<id>`. `setSite()` sets the address at the top of each
+builder.
 
-Behaviour is driven by the `reminder_settings` row, edited on the
-Notifications tab. The function does nothing while `reminders_enabled` is false, which is
-the default, so the cron job is safe to schedule early. The cron fires daily
-and `isSendDay()` turns that into weekly or monthly. Monthly is the default.
+The look copies the site: the same red, amber, blue and green, pills, cards
+with a coloured left edge. `TONE` holds the colours. Layout is tables with
+inline styles because mail clients ignore stylesheets. `toPlain()` builds the
+plain text part, keeping only mute link addresses.
 
-`?dry=1` returns the built email including its HTML, without sending or
-recording. The site renders that HTML in a sandboxed iframe via `srcdoc`, so
-the preview is the real email rather than a summary of it. `?force=1` ignores
-both the schedule and the enabled flag, behind a confirm dialog that names
-the recipient. CORS headers are required because the site calls
-the function directly from the browser.
+`days_ahead`, `cooldown_days` and the per person `delivery_mode` of the
+summary are leftovers. The summary goes to `digest_email`, set by migration.
+Due notices are the per person email now.
 
-Only the Resend key and sender stay as secrets, since the settings table is
-readable by anyone who can reach the site. Digest mode sends one grouped
-email and is the only free option, because Resend's `onboarding@resend.dev`
-sender only delivers to the Resend account owner's own address. Per person
-mode needs a verified domain, roughly $12 a year. Evan is on digest mode to
-37212th@gmail.com, which forwards to the whole board.
+The Notifications tab has one block per kind: the summary's Monthly or Never
+radio, day and recipient line with Preview and Send it now, then On or Off
+with a Preview for due notices and for schedule reminders, and one Save.
+Evan asked for the recipient control to come back later.
 
-The Notifications tab is deliberately tiny: a Monthly or Never radio, the day of
-the month when Monthly is chosen, one line naming the recipient, and three
-buttons. Monthly maps to `reminders_enabled = true`, Never to false.
-`delivery_mode` and `digest_email` are no longer editable on the site and are
-set by migration. Evan asked for the recipient control to come back later.
-
-**A preview must never be gated by the send checks.** The enabled flag, the
-send day and the already-sent-today guard decide whether to SEND, so `dry`
-skips all three. Getting this wrong on 2026-08-31 made Preview useless
-exactly when it was needed, before turning delivery on, and the symptom
-looked like a stale deployment. /tmp/test-gating.ts in that session pins the
-rule.
-
-A browser fetch to the function that fails outright is almost always CORS,
-which in practice means the deployed build predates the CORS headers. That
-happened on 2026-08-31 and the error text now says exactly that. When
-changing the function, remember it must be redeployed before the site can
-use the new behaviour.
+The builders are pure on purpose. There is no Deno in the container. To
+test, copy `index.ts` without the `npm:` import line and import it from a
+script run with `node --experimental-strip-types`.
 
 ## Mobile navigation
 
 Below 1160px the top bar tabs are hidden and a hamburger opens a left
 sidebar. The top bar holds only the logo, the name and the tabs. Add
-responsibility lives on the Responsibilities toolbar, by Evan's choice. The breakpoint is set by how many tabs there are, not
-by a device size. Eight tabs and the logo stop fitting at about 1160px, so adding another
-tab means testing widths again and probably raising it. `.tabs` is
-`nowrap` so a too-small breakpoint shows as horizontal overflow rather than a
-second row. The tabs exist twice in the markup, once in the top bar
-and once in the sidebar, and `showView()` keeps both copies in sync by
-`data-tab`. `showView()` also writes the tab to the address as `#name`, and
-`route()` reads it on load and on `hashchange`: `#tasks` opens a tab, and
-`#task/<id>` (also vendor, account, member, role, fixture, schedule) opens
-the tab with that record's dialog on top. `ROUTES` maps each kind. The
-email's links depend on this, so keep the names stable. The logo and name in both places are a `.brand-home` link back to
-the dashboard. Escape closes a dialog first and only falls through to the
-sidebar when no dialog is open. The sidebar is unhidden before the `open`
-class is added on the next frame, otherwise the slide in animation does not
-run.
+responsibility lives on the Responsibilities toolbar, by Evan's choice. The
+breakpoint is set by how many tabs there are, not by a device size. Eight
+tabs and the logo stop fitting at about 1160px, so adding another tab means
+testing widths again and probably raising it. `.tabs` is `nowrap` so a too
+small breakpoint shows as horizontal overflow rather than a second row. The
+tabs exist twice in the markup, once in the top bar and once in the sidebar,
+and `showView()` keeps both copies in sync by `data-tab`. `showView()` also
+writes the tab to the address as `#name`, and `route()` reads it on load and
+on `hashchange`: `#tasks` opens a tab, and `#task/<id>` (also vendor,
+account, member, role, fixture, schedule) opens the tab with that record's
+dialog on top. `ROUTES` maps each kind. The emails' links depend on this, so
+keep the names stable. The logo and name in both places are a `.brand-home`
+link back to the dashboard. Escape closes a dialog first and only falls
+through to the sidebar when no dialog is open. The sidebar is unhidden
+before the `open` class is added on the next frame, otherwise the slide in
+animation does not run.
 
 ## Responsibilities toolbar and Board tab
 
@@ -262,7 +296,7 @@ only, and only another choice counts toward "Filter (2)". The status badge
 shows only under All statuses. In the Active view the last column holds just
 the done button under a visually hidden heading, and in the Complete and
 Canceled views that column is hidden through `data-view` on the table. The
-dashboard, the role and member counts and the email all count active items
+dashboard, the role and member counts and the emails all count active items
 only.
 
 The table is kept sparse on purpose. Columns are responsibility, assigned
@@ -284,19 +318,21 @@ by due date, then done ones.
 
 Cards are kept short, by Evan's choice, with the rest in the dialog a card
 opens. A vendor card is company, service, website and the primary contact's
-email. An account card is name, category and website. A fixture card is the
-swatch, name, brand and number. Do not add lines back. Since document chips
-are no longer on cards, each saved row in the document editor has an Open
-link.
+email. An account card is name, category and website, never the password. A
+fixture card is the swatch, name, brand and number. Do not add lines back.
+Since document chips are no longer on cards, each saved row in the document
+editor has an Open link.
 
-The Board tab has a Roles grid and a Members grid. A role card is the role
-and its holder, and opens the role modal. A member tile is the picture,
-name, apartment, email and phone, with no role and no count. It is a `div`,
-not a button, because the email and phone are links: the name is a button
-whose hit area is stretched over the whole tile and opens the member, and
-the links sit above it. The Responsibilities person filter goes by member
-through `memberOfTask()`, not by role, and Unassigned covers vacant roles
-too.
+The Board tab has a Roles grid, a Members grid and, when there are any, a
+Residents grid. Add resident and Add member open the same dialog with the
+"On the board" box unticked or ticked, and the title follows the box. A role
+card is the role and its holder, and opens the role modal. A person tile is
+the picture, name, apartment, email and phone, with no role and no count.
+It is a `div`, not a button, because the email and phone are links: the
+name is a button whose hit area is stretched over the whole tile and opens
+the person, and the links sit above it. The Responsibilities person filter
+goes by member through `memberOfTask()`, not by role, and Unassigned covers
+vacant roles too.
 
 ## Colour
 
@@ -306,20 +342,22 @@ Every tab uses the dashboard's palette. A `tone-amber`, `tone-blue`,
 `.schedule-card` and `.settings-block` inside it pick them up for the label,
 the left edge and the subtitle. There is no red tone, because red means
 overdue. Vendors are green when contracted and blue when recommended, roles
-purple, members blue. Accounts and fixtures take a tone from their category
-through `ACCOUNT_TONE` and `FIXTURE_TONE`, falling back to blue. Category
-badges on responsibilities stay neutral so they do not compete with the
-status colours. New tones must meet AA on white and on their own tint.
+purple, members blue, residents slate. On the Notifications tab the summary
+is blue, due notices amber and schedule reminders green. Accounts and
+fixtures take a tone from their category through `ACCOUNT_TONE` and
+`FIXTURE_TONE`, falling back to blue. Category badges on responsibilities
+stay neutral so they do not compete with the status colours. New tones must
+meet AA on white and on their own tint.
 
 ## People's pictures
 
-`avatar(m)` draws a member's Gravatar over the first letter of their first
+`avatar(m)` draws a person's Gravatar over the first letter of their first
 name. The hash is a SHA-256 of the trimmed, lowercased email, worked out by
-`hashEmails()` before the first render and after a member is saved, since
+`hashEmails()` before the first render and after a person is saved, since
 hashing is async and rendering is not. The request uses `d=404`, and a
 capture phase `error` listener removes the image and remembers the hash in
 `noGravatar`, so the letter shows and the request is not repeated. This
-sends a hash of each member's email to gravatar.com. A vacant role shows
+sends a hash of each person's email to gravatar.com. A vacant role shows
 the first letter of the role, and an unassigned item shows NA.
 
 ## Logo
@@ -327,7 +365,8 @@ the first letter of the role, and an unassigned item shows NA.
 `logo.svg` is the monster face from the building's Halloween balcony
 display. `favicon.svg` is a simpler cut that survives 16px. `favicon.png`
 and `apple-touch-icon.png` are renders of those two, so regenerate them if
-the SVGs change.
+the SVGs change. `mute/logo.png` is a copy of `apple-touch-icon.png` for the
+emails, so copy it again when that changes.
 
 ## Fixtures
 
@@ -338,9 +377,9 @@ A fixture can carry one picture, shown on its card. It is either uploaded or
 linked, and both end up as an address in `fixtures.image_url`. An upload is
 shrunk in the browser to 1200px by `shrinkImage()` and put in the public
 Storage bucket `fixture-images` through `store.upload()`, which the demo
-store answers with a page-only blob address. The bucket and its policies
-come from a migration: open to `anon` like everything else, images only,
-5 MB a file. Replacing or removing a picture leaves the old file in the
+store answers with a page only blob address. The bucket is public, images
+only, 5 MB a file. Before the lockdown anon may add to it, afterwards only
+the proxy can. Replacing or removing a picture leaves the old file in the
 bucket. Nothing deletes it, which is fine at this size.
 
 Paint swatches were read from Benjamin Moore's own colour pages, from the
@@ -360,15 +399,37 @@ keyboard or a screen reader, so both paths must keep working. There is no
 document type dropdown any more, and new rows are saved with kind
 `document`. Rows with an empty address are dropped on save.
 
-The schedule slot editor in the Schedules tab is leaner, by Evan's choice.
-A row is an apartment, a first month and a last month, reordered by
-dragging only, with no up and down buttons, and removed with the x on the
-right. There is no period field: `periodLabel()` names it from the months,
-such as "January/February", and that is saved to `label` as well. The
-apartment is stored as a bare number, since "Apt" is implied, and
-`apartment()` strips the prefix from any older value. The email is the one place that
-writes "Apt 5", through `aptLabel()`, since it has no Apartment heading. `isCurrentSlot()`
-marks whoever is up this month. It handles ranges that wrap past December.
+A schedule row is an apartment, an optional description, one or more date
+ranges in `schedule_slot_ranges`, a "Repeats every year" box
+(`repeats_yearly`), and the people on it in `schedule_slot_people`, each
+with an Emails box that is the inverse of `muted`. The schedule itself has
+`remind_days`, weekdays 0 for Sunday to 6, and `remind_hour`, New York
+time, edited as day chips and a Time select in its dialog. The trash
+started at Tuesday and Friday, 7AM.
+
+`slotEditor` keeps the rows as drafts with their ranges and people and the
+ids removed from each, and the schedule form saves slots, then ranges, then
+people. Rows reorder by dragging only, with no up and down buttons, and are
+removed with the x on the right, by Evan's choice. Events are delegated on
+`#cf-slots`, and focus is put back after each re-render. Saving is refused
+when a range has only one date, or when a range that does not repeat ends
+before it starts. A yearly range may end before it starts, which means it
+wraps past December.
+
+`rangeCovers()`, `rangeLabel()` and `isCurrentSlot()` in `app.js` match
+`rangeCovers()`, `rangeLabel()` and `coveringRange()` in the email function.
+Keep them in step. A yearly range ignores the year, wraps when the end is
+before the start, covers every day when it spans a year, and covers
+February 29 when it ends on the 28th. Labels name whole months
+("November", "January/February") and otherwise days ("March 3 to 20"), with
+the year only when the row does not repeat. The label is also saved to
+`schedule_slots.label`. The migration turned the old month pairs into 2024
+ranges, a leap year, and put each board member on the row for their
+apartment. `month_start` and `month_end` are dead columns now.
+
+The apartment is stored as a bare number, since "Apt" is implied, and
+`apartment()` strips the prefix from any older value. The emails write
+"Apt 5" through `aptLabel()`.
 
 ## Conventions and gotchas
 
@@ -377,26 +438,28 @@ marks whoever is up this month. It handles ranges that wrap past December.
   it done and never inserts a row. `rollForward()` keeps it active,
   records today in `last_completed_on`, and moves `due_date` with
   `nextDue()`, which steps from the old due date past any missed cycles, or
-  from today when there was no date. Both paths call `rollForward()`. Rows
-  that are done and repeating are leftovers from the older behaviour, which
-  inserted a new row each time.
+  from today when there was no date. Both paths call `rollForward()`.
 * The dashboard's Expected annual cost counter annualizes repeating items
   (cost times 12 over the cycle in months) and adds one time items that are
   overdue or due within a year. Ongoing items and undated one time items
   are left out, since nothing says how often they cost.
-* The dashboard's Recently completed list therefore also shows open
-  repeating items by `last_completed_on`.
+* The dashboard's Recently completed list also shows open repeating items
+  by `last_completed_on`.
 * Recurrence values are none, ongoing, monthly, quarterly, semiannual,
   annual, biennial, three_year, four_year, five_year. Ongoing is not a
   cycle: `isOngoing()` items have no due date, show "Ongoing" in the Due
-  column, have no done button, get their own dashboard section, and end only
-  by being set to Complete or Canceled. `isRecurring()` is false for them. Adding a value means updating the check
-  constraint, `RECUR_LABEL`, `RECUR_MONTHS`, and the select in `index.html`.
+  column, have no done button and no reminders, get their own dashboard
+  section, and end only by being set to Complete or Canceled.
+  `isRecurring()` is false for them. Adding a value means updating the
+  check constraint, `RECUR_LABEL`, `RECUR_MONTHS`, and the select in
+  `index.html`.
 * The tab that edits `reminder_settings` is labeled Notifications, with
   `data-tab="notifications"` and `#notifications`. Its functions keep the
   old Settings names, such as `renderSettings()`.
 * `[hidden] { display: none !important }` in style.css is what makes hiding
   work, since several classes set `display: flex`. Do not remove it.
+* Fieldsets default to `min-width: min-content`, which pushed the schedule
+  rows off screen on phones. `.links-fieldset` sets `min-width: 0`.
 * All user text passes through `esc()` before reaching innerHTML, and all
   outbound URLs pass through `safeUrl()`.
 * Dates are `YYYY-MM-DD` strings compared lexically, built in local time by
@@ -410,23 +473,32 @@ marks whoever is up this month. It handles ranges that wrap past December.
 ## Testing
 
 Serve locally with `python3 -m http.server` and drive demo mode with
-Playwright. Automated tests must pass the gate first.
+Playwright. Automated tests must pass the gate first. In demo mode a reload
+resets the data, so move between tabs by clicking them.
 
 Worth repeating after changes: the gate, add, edit and delete for every
-record type including roles, Mark done on a recurring item (row count
-unchanged, still active, and the next date is right), each status filter
-view including which of the badge and done button show, reassigning a
-role and checking the member's list follows, links add and remove, the
-Filter button and its filters, sorting by each heading in both directions, Escape closing a
-dialog, the settings form including the live summary and the guard on an empty
-digest address, document reorder and rename round trips, schedule editing including drag
-reorder and the x,
-and the mobile viewport.
+record type including roles and residents, Mark done on a recurring item
+(row count unchanged, still active, and the next date is right), each status
+filter view including which of the badge and done button show, reassigning
+a role and checking the member's list follows, moving a member to resident
+vacating their roles, the reminder box on a responsibility, the password
+field and its eye button, links add and remove, the Filter button and its
+filters, sorting by each heading in both directions, Escape closing a
+dialog, the Notifications tab, document reorder and rename round trips,
+schedule editing including ranges, people, the Emails box, the day chips,
+the validation messages, drag reorder and the x, and the mobile viewport.
 
-The container blocks jsDelivr, so `window.supabase` is undefined here and any
-test that leaves demo mode must stub the network with `page.route`. See
-/tmp/test-preview.js in the session that built this for the pattern: stub
-config.js, `**/rest/v1/**`, and `**/functions/v1/send-reminders**`.
+The container blocks jsDelivr, so `window.supabase` is undefined here. To
+test proxy mode, install `@supabase/supabase-js@2` with npm, serve its
+`dist/umd/supabase.js` for the jsDelivr URL with `page.route`, stub
+`config.js` with `USE_PROXY: true`, and stub `**/api/sb/**`. Every request
+should go to `/api/sb/`, none to supabase.co.
+
+The Pages Functions run under Node 22 with a `package.json` of
+`{"type":"module"}` next to a copy, a stubbed global `fetch`, and RSA keys
+made with `crypto.subtle` to sign test Access tokens. Check a good token, a
+wrong audience, issuer, key and signature, an expired one, path escapes, the
+missing configuration case, and the mute page's GET, POST and one click.
 
 Playwright note: `.info-card` matches cards in hidden views too, so scope
 selectors to the visible section, for example `#view-accounts .info-card`.
@@ -434,9 +506,10 @@ Clicking a card's centre can land on a link chip, which opens the link
 instead of the modal, so click the heading.
 
 Migrations can be verified without Docker. Run `initdb` on a scratch cluster,
-`create role anon; create role authenticated;`, then psql the migration files
-in order and re-run them to confirm they are idempotent. Verified this way on
-Postgres 16 on 2026-08-31.
+`create role anon; create role authenticated; create role service_role;`,
+then psql the migration files in order and re-run them to confirm they are
+idempotent, then run `lockdown.sql` twice and check no public policy is
+left. Last verified this way on Postgres 16 on 2026-11-17.
 
 ## Keep documentation current
 

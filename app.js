@@ -48,7 +48,9 @@
     const members = [
       { id: uid(), name: "Sample President", email: "president@example.com", phone: "", apartment: "1" },
       { id: uid(), name: "Sample Treasurer", email: "treasurer@example.com", phone: "", apartment: "2" },
+      { id: uid(), name: "Sample Resident", email: "resident@example.com", phone: "", apartment: "2", on_board: false },
     ];
+    members.forEach((x) => { if (x.on_board === undefined) x.on_board = true; });
     const vendors = [
       { id: uid(), name: "Sample Cleaning Co", service: "Janitorial", website: "", notes: "", status: "contracted", cost: 500, cost_period: "monthly" },
       { id: uid(), name: "Sample Electric", service: "Electrician", website: "", notes: "", status: "recommended", cost: null, cost_period: null },
@@ -64,7 +66,7 @@
     const m = (i) => roles[i].id, v = (i) => vendors[i].id;
     const tasks = [
       { id: uid(), title: "Sample overdue project", description: "This is demo data.", category: "Maintenance", status: "open", priority: "high", due_date: d(-40), last_completed_on: "2019-01-01", recurrence: "none", estimated_cost: 4000, role_id: m(0), vendor_id: null, completed_at: null },
-      { id: uid(), title: "Sample inspection", description: "", category: "Inspections", status: "open", priority: "normal", due_date: d(12), last_completed_on: null, recurrence: "annual", estimated_cost: 1500, role_id: m(1), vendor_id: v(0), completed_at: null },
+      { id: uid(), title: "Sample inspection", description: "", category: "Inspections", status: "open", priority: "normal", due_date: d(12), send_reminders: true, last_completed_on: null, recurrence: "annual", estimated_cost: 1500, role_id: m(1), vendor_id: v(0), completed_at: null },
       { id: uid(), title: "Sample filing", description: "", category: "Legal & Compliance", status: "open", priority: "high", due_date: d(60), last_completed_on: null, recurrence: "annual", estimated_cost: null, role_id: m(0), vendor_id: null, account_id: null, completed_at: null },
       { id: uid(), title: "Sample completed item", description: "", category: "Financial", status: "done", priority: "normal", due_date: d(-90), last_completed_on: null, recurrence: "none", estimated_cost: null, role_id: m(1), vendor_id: null, completed_at: new Date(today.getTime() - 88 * 864e5).toISOString() },
       { id: uid(), title: "Sample canceled item", description: "", category: "Maintenance", status: "canceled", priority: "normal", due_date: d(20), last_completed_on: null, recurrence: "none", estimated_cost: null, role_id: null, vendor_id: null, completed_at: null },
@@ -73,14 +75,26 @@
     const links = [
       { id: uid(), title: "Sample document", url: "https://example.com", kind: "document", responsibility_id: tasks[0].id, vendor_id: null, account_id: null },
     ];
-    const settings = { id: 1, reminders_enabled: false, frequency: "monthly", send_weekday: 1,
-      send_day_of_month: 1, delivery_mode: "digest", digest_email: "board@example.com", last_sent_at: null };
-    const schedules = [{ id: uid(), name: "Trash and recycling", description: "Sample rotation.", position: 0 }];
+    const settings = { id: 1, reminders_enabled: false, due_notices_enabled: false, schedule_reminders_enabled: false,
+      frequency: "monthly", send_weekday: 1, send_day_of_month: 1, delivery_mode: "digest",
+      digest_email: "board@example.com", last_sent_at: null };
+    const schedules = [{ id: uid(), name: "Trash and recycling", description: "Sample rotation.", position: 0,
+      remind_days: [2, 5], remind_hour: 7 }];
     const scheduleSlots = [1, 3, 5, 7, 9, 11].map((mo, i) => ({
       id: uid(), schedule_id: schedules[0].id,
       label: MONTHS_SEED[mo - 1] + "/" + MONTHS_SEED[mo],
-      responsible: String(i + 1), month_start: mo, month_end: mo + 1, position: i,
+      responsible: String(i + 1), description: null, repeats_yearly: true, position: i,
     }));
+    const slotRanges = scheduleSlots.map((x, i) => ({
+      id: uid(), slot_id: x.id, position: 0,
+      start_date: "2024-" + String(2 * i + 1).padStart(2, "0") + "-01",
+      end_date: ymd(new Date(2024, 2 * i + 2, 0)),
+    }));
+    const slotPeople = [
+      { id: uid(), slot_id: scheduleSlots[1].id, member_id: members[1].id, muted: false, position: 0 },
+      { id: uid(), slot_id: scheduleSlots[1].id, member_id: members[2].id, muted: false, position: 1 },
+    ];
+    const secrets = [{ account_id: accounts[0].id, password: "sample-password" }];
     const fixtures = [
       { id: uid(), name: "Sample Paint", category: "Paint", brand: "Sample Brand", code: "123",
         location: "Walls", url: "https://example.com", image_url: null, color_hex: "#E0DFD7", notes: "", position: 0 },
@@ -93,7 +107,8 @@
       { id: uid(), vendor_id: vendors[1].id, name: "Sample Electrician", email: "info@example.com", phone: null, is_primary: true, position: 0 },
     ];
     tasks[2].account_id = accounts[1].id;
-    return { members, roles, vendors, contacts, tasks, links, accounts, settings, schedules, scheduleSlots, fixtures };
+    return { members, roles, vendors, contacts, tasks, links, accounts, settings, schedules, scheduleSlots,
+      slotRanges, slotPeople, secrets, fixtures };
   }
 
   const TABLE = {
@@ -101,7 +116,8 @@
     tasks: "responsibilities", links: "links", accounts: "accounts",
     settings: "reminder_settings",
     schedules: "schedules", scheduleSlots: "schedule_slots", fixtures: "fixtures",
-    contacts: "vendor_contacts",
+    contacts: "vendor_contacts", slotRanges: "schedule_slot_ranges", slotPeople: "schedule_slot_people",
+    secrets: "account_secrets",
   };
 
   function makeDemoStore() {
@@ -111,6 +127,7 @@
       async load() { return demoData(); },
       async insert(_kind, row) { return Object.assign({ id: crypto.randomUUID() }, row); },
       async update(_kind, _id, patch) { return patch; },
+      async upsert(_kind, row) { return row; },
       async remove(_kind, _id) {},
       // Nothing is stored in demo mode, so the picture lives for this page only.
       async upload(_bucket, file) { return URL.createObjectURL(file); },
@@ -122,7 +139,7 @@
       throw new Error("The Supabase library did not load. Check the network connection, " +
         "or whether the script tag at the bottom of index.html is being blocked.");
     }
-    const client = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+    const client = window.supabase.createClient(apiBase(), CFG.SUPABASE_ANON_KEY);
     async function q(promise) {
       const { data, error } = await promise;
       if (error) throw new Error(error.message);
@@ -130,7 +147,8 @@
     }
     return {
       async load() {
-        const [members, vendors, tasks, links, accounts, settings, schedules, scheduleSlots, fixtures, roles, contacts] = await Promise.all([
+        const [members, vendors, tasks, links, accounts, settings, schedules, scheduleSlots, fixtures, roles, contacts,
+          slotRanges, slotPeople, secrets] = await Promise.all([
           q(client.from(TABLE.members).select("*").order("name")),
           q(client.from(TABLE.vendors).select("*").order("name")),
           q(client.from(TABLE.tasks).select("*").order("due_date", { ascending: true, nullsFirst: false })),
@@ -144,10 +162,14 @@
           q(client.from(TABLE.fixtures).select("*").order("position")).catch(() => []),
           q(client.from(TABLE.roles).select("*").order("position")).catch(() => []),
           q(client.from(TABLE.contacts).select("*").order("position")).catch(() => []),
+          q(client.from(TABLE.slotRanges).select("*").order("position")).catch(() => []),
+          q(client.from(TABLE.slotPeople).select("*").order("position")).catch(() => []),
+          // Empty without the proxy, since the anon key cannot read this table.
+          q(client.from(TABLE.secrets).select("*")).catch(() => []),
         ]);
         return {
           members, roles, vendors, contacts, tasks, links, accounts,
-          settings: settings[0] || null, schedules, scheduleSlots, fixtures,
+          settings: settings[0] || null, schedules, scheduleSlots, fixtures, slotRanges, slotPeople, secrets,
         };
       },
       async insert(kind, row) {
@@ -155,6 +177,9 @@
       },
       async update(kind, id, patch) {
         return (await q(client.from(TABLE[kind]).update(patch).eq("id", id).select()))[0];
+      },
+      async upsert(kind, row) {
+        return (await q(client.from(TABLE[kind]).upsert(row).select()))[0];
       },
       async remove(kind, id) {
         await q(client.from(TABLE[kind]).delete().eq("id", id));
@@ -165,10 +190,22 @@
         const path = crypto.randomUUID() + "." + ext;
         const { error } = await client.storage.from(bucket).upload(path, file, { contentType: file.type });
         if (error) throw new Error(error.message);
-        return client.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+        // Saved with the real Supabase address, so the picture also shows
+        // where the proxy is not in the way, such as in an email.
+        return client.storage.from(bucket).getPublicUrl(path).data.publicUrl
+          .replace(apiBase(), CFG.SUPABASE_URL.replace(/\/$/, ""));
       },
     };
   }
+
+  // With USE_PROXY the site reaches Supabase through the Pages Function at
+  // /api/sb, which checks the Cloudflare Access login and adds the service
+  // key. Without it, requests go straight to Supabase with the anon key.
+  function apiBase() {
+    return CFG.USE_PROXY ? location.origin + "/api/sb" : CFG.SUPABASE_URL.replace(/\/$/, "");
+  }
+  // Passwords are only shown and saved where the anon key is not in use.
+  const secretsAvailable = demoMode || !!CFG.USE_PROXY;
 
   // Built lazily so nothing is fetched before the password gate is passed.
   let store = null;
@@ -181,7 +218,7 @@
   // State and helpers
   // ------------------------------------------------------------------
   let S = { members: [], roles: [], vendors: [], contacts: [], tasks: [], links: [], accounts: [],
-    settings: null, schedules: [], scheduleSlots: [], fixtures: [] };
+    settings: null, schedules: [], scheduleSlots: [], slotRanges: [], slotPeople: [], secrets: [], fixtures: [] };
   const $ = (id) => document.getElementById(id);
 
   function esc(s) {
@@ -231,6 +268,10 @@
     return { text: "Due " + fmtDate(t.due_date), cls: "" };
   }
   function memberById(id) { return S.members.find((m) => m.id === id); }
+  // Residents are people records that are not on the board. They can be on
+  // schedules but cannot hold roles.
+  function onBoard(m) { return m.on_board !== false; }
+  function boardMembers() { return S.members.filter(onBoard); }
   function roleById(id) { return S.roles.find((r) => r.id === id); }
   function sortedRoles() {
     return S.roles.slice().sort((a, b) =>
@@ -598,15 +639,20 @@
 
     // The whole tile opens the member through the name button, whose hit area
     // is stretched over the card. The email and phone links sit above it.
-    $("member-grid").innerHTML = S.members.map((m) =>
-      '<div class="info-card card-stretch tone-blue">' +
+    const tile = (m, tone) =>
+      '<div class="info-card card-stretch tone-' + tone + '">' +
         '<div class="member-head">' + avatar(m, "avatar-lg") +
         '<div><h3><button type="button" class="card-open" data-member="' + m.id + '">' + esc(m.name) + "</button></h3>" +
         (m.apartment ? '<div class="sub">Apartment ' + esc(m.apartment) + "</div>" : "") + "</div></div>" +
         (m.email ? '<div class="contact-line"><a href="mailto:' + esc(m.email) + '">' + esc(m.email) + "</a></div>" : "") +
         (m.phone ? '<div class="contact-line"><a href="tel:' + esc(m.phone) + '">' + esc(m.phone) + "</a></div>" : "") +
-        "</div>").join("");
-    $("member-empty").hidden = S.members.length > 0;
+        "</div>";
+    const board = boardMembers();
+    const residents = S.members.filter((m) => !onBoard(m));
+    $("member-grid").innerHTML = board.map((m) => tile(m, "blue")).join("");
+    $("member-empty").hidden = board.length > 0;
+    $("resident-grid").innerHTML = residents.map((m) => tile(m, "slate")).join("");
+    $("resident-heading").hidden = !residents.length;
   }
 
   function renderFilterOptions() {
@@ -614,7 +660,7 @@
       CATEGORIES.map((c) => "<option>" + esc(c) + "</option>").join("");
     $("filter-assignee").innerHTML =
       '<option value="">Everyone</option><option value="none">Unassigned</option>' +
-      S.members.map((m) => '<option value="' + m.id + '">' + esc(m.name) + "</option>").join("");
+      boardMembers().map((m) => '<option value="' + m.id + '">' + esc(m.name) + "</option>").join("");
   }
 
   function renderAll() {
@@ -844,16 +890,20 @@
     fillSelect($("tf-vendor"), S.vendors, t ? t.vendor_id : "", "None");
     fillSelect($("tf-account"), S.accounts, t ? t.account_id : "", "None");
     $("tf-status").value = t && !isActive(t) ? t.status : "open";
+    $("tf-remind").checked = !!(t && t.send_reminders);
+    syncOngoing();
     $("tf-delete").hidden = !t;
     taskLinkEditor.reset(t ? linksFor("task", t.id) : []);
     openModal("task-modal");
     $("tf-title").focus();
   }
 
-  // An ongoing item has no due date, so the field is cleared and disabled.
+  // An ongoing item has no due date, so the field is cleared and disabled,
+  // and there is nothing to send reminders about.
   function syncOngoing() {
     const on = $("tf-recurrence").value === "ongoing";
     $("tf-due").disabled = on;
+    $("tf-remind").disabled = on;
     if (on) $("tf-due").value = "";
   }
   $("tf-recurrence").addEventListener("change", syncOngoing);
@@ -878,6 +928,7 @@
       vendor_id: $("tf-vendor").value || null,
       account_id: $("tf-account").value || null,
       status: $("tf-status").value,
+      send_reminders: $("tf-remind").checked && $("tf-recurrence").value !== "ongoing",
       completed_at: nowDone ? (existing && existing.completed_at) || new Date().toISOString() : null,
     };
     // Same rule as the Mark done button.
@@ -1073,6 +1124,32 @@
   });
 
   // ---------------- account modal ----------------
+  function secretOf(accountId) {
+    const x = S.secrets.find((s) => s.account_id === accountId);
+    return x ? x.password : null;
+  }
+  // The password stays hidden until the eye button is pressed.
+  function showPassword(show) {
+    $("af-password").type = show ? "text" : "password";
+    $("af-password-toggle").setAttribute("aria-pressed", String(show));
+    $("af-password-toggle").setAttribute("aria-label", show ? "Hide password" : "Show password");
+    $("af-eye-open").hidden = show;
+    $("af-eye-shut").hidden = !show;
+  }
+  $("af-password-toggle").addEventListener("click", () =>
+    showPassword($("af-password").type === "password"));
+
+  async function saveSecret(accountId) {
+    if (!secretsAvailable) return;
+    const password = $("af-password").value || null;
+    if ((secretOf(accountId) || null) === password) return;
+    const row = { account_id: accountId, password, updated_at: new Date().toISOString() };
+    await getStore().upsert("secrets", row);
+    const existing = S.secrets.find((x) => x.account_id === accountId);
+    if (existing) existing.password = password;
+    else S.secrets.push({ account_id: accountId, password });
+  }
+
   function openAccountModal(a) {
     $("account-modal-title").textContent = a ? "Edit account" : "Add account";
     $("af-id").value = a ? a.id : "";
@@ -1082,6 +1159,9 @@
     $("af-username").value = a ? (a.username || "") : "";
     $("af-url").value = a ? (a.portal_url || "") : "";
     $("af-notes").value = a ? (a.notes || "") : "";
+    $("af-password-field").hidden = !secretsAvailable;
+    $("af-password").value = (a && secretOf(a.id)) || "";
+    showPassword(false);
     $("af-delete").hidden = !a;
     accountLinkEditor.reset(a ? linksFor("account", a.id) : []);
     openModal("account-modal");
@@ -1105,10 +1185,12 @@
         const patch = await getStore().update("accounts", id, row);
         Object.assign(existing, patch || row);
         await saveLinks(accountLinkEditor, "account_id", id);
+        await saveSecret(id);
       } else {
         const created = await getStore().insert("accounts", row);
         S.accounts.push(created);
         await saveLinks(accountLinkEditor, "account_id", created.id);
+        await saveSecret(created.id);
       }
       closeModal("account-modal");
       toast("Saved.");
@@ -1122,6 +1204,7 @@
     try {
       await getStore().remove("accounts", id);
       S.accounts = S.accounts.filter((a) => a.id !== id);
+      S.secrets = S.secrets.filter((x) => x.account_id !== id);
       S.links = S.links.filter((l) => l.account_id !== id);
       S.tasks.forEach((t) => { if (t.account_id === id) t.account_id = null; });
       closeModal("account-modal");
@@ -1131,8 +1214,10 @@
   });
 
   // ---------------- member modal ----------------
-  function openMemberModal(m) {
-    $("member-modal-title").textContent = m ? "Edit board member" : "Add board member";
+  function openMemberModal(m, resident) {
+    const board = m ? onBoard(m) : !resident;
+    $("member-modal-title").textContent = (m ? "Edit " : "Add ") + (board ? "board member" : "resident");
+    $("mf-board").checked = board;
     $("mf-id").value = m ? m.id : "";
     $("mf-name").value = m ? m.name : "";
     $("mf-apartment").value = m ? (m.apartment || "") : "";
@@ -1143,6 +1228,11 @@
     $("mf-name").focus();
   }
 
+  $("mf-board").addEventListener("change", () => {
+    const what = $("mf-board").checked ? "board member" : "resident";
+    $("member-modal-title").textContent = ($("mf-id").value ? "Edit " : "Add ") + what;
+  });
+
   $("member-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const id = $("mf-id").value;
@@ -1151,11 +1241,19 @@
       apartment: $("mf-apartment").value.trim() || null,
       email: $("mf-email").value.trim() || null,
       phone: $("mf-phone").value.trim() || null,
+      on_board: $("mf-board").checked,
     };
     try {
       if (id) {
         const existing = memberById(id);
         const patch = await getStore().update("members", id, row);
+        // Only people on the board hold roles.
+        if (!row.on_board) {
+          for (const r of S.roles.filter((x) => x.member_id === id)) {
+            await getStore().update("roles", r.id, { member_id: null });
+            r.member_id = null;
+          }
+        }
         Object.assign(existing, patch || row);
       } else {
         S.members.push(await getStore().insert("members", row));
@@ -1170,10 +1268,13 @@
 
   $("mf-delete").addEventListener("click", async () => {
     const id = $("mf-id").value;
-    if (!id || !confirm("Remove this board member? Their roles become vacant.")) return;
+    const m = memberById(id);
+    const ask = m && !onBoard(m) ? "Remove this resident?" : "Remove this board member? Their roles become vacant.";
+    if (!id || !confirm(ask)) return;
     try {
       await getStore().remove("members", id);
-      S.members = S.members.filter((m) => m.id !== id);
+      S.members = S.members.filter((x) => x.id !== id);
+      S.slotPeople = S.slotPeople.filter((p) => p.member_id !== id);
       S.roles.forEach((r) => { if (r.member_id === id) r.member_id = null; });
       closeModal("member-modal");
       toast("Removed.");
@@ -1187,7 +1288,7 @@
     $("role-modal-title").textContent = r ? "Edit role" : "Add role";
     $("rf-id").value = r ? r.id : "";
     $("rf-name").value = r ? r.name : "";
-    fillSelect($("rf-member"), S.members, r ? r.member_id : "", "Vacant");
+    fillSelect($("rf-member"), boardMembers(), r ? r.member_id : "", "Vacant");
     $("rf-delete").hidden = !r;
     openModal("role-modal");
     $("rf-name").focus();
@@ -1383,58 +1484,113 @@
   // ------------------------------------------------------------------
   const MONTHS = ["January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"];
+  const byPosition = (a, b) => (a.position || 0) - (b.position || 0);
 
   function slotsFor(scheduleId) {
-    return S.scheduleSlots.filter((x) => x.schedule_id === scheduleId)
-      .sort((a, b) => (a.position || 0) - (b.position || 0));
+    return S.scheduleSlots.filter((x) => x.schedule_id === scheduleId).sort(byPosition);
   }
+  function rangesFor(slotId) { return S.slotRanges.filter((r) => r.slot_id === slotId).sort(byPosition); }
+  function peopleFor(slotId) { return S.slotPeople.filter((p) => p.slot_id === slotId).sort(byPosition); }
 
-  // A slot is current when this month falls inside its month range. Ranges
-  // that wrap around the end of the year are handled too.
-  function isCurrentSlot(slot, month) {
-    if (!slot.month_start || !slot.month_end) return false;
-    if (slot.month_start <= slot.month_end) {
-      return month >= slot.month_start && month <= slot.month_end;
+  // A row covers one or more date ranges. When it repeats every year the
+  // year is ignored, a range may wrap past December, and a range ending on
+  // February 28 also covers the 29th. The email function in
+  // supabase/functions/send-reminders applies the same rules, so keep the
+  // two in step.
+  function dayDiff(a, b) {
+    return Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 864e5);
+  }
+  function rangeCovers(r, yearly, day) {
+    if (!r.start_date || !r.end_date) return false;
+    if (!yearly) return day >= r.start_date && day <= r.end_date;
+    if (dayDiff(r.start_date, r.end_date) >= 365) return true;
+    const s = r.start_date.slice(5);
+    const e = r.end_date.slice(5) === "02-28" ? "02-29" : r.end_date.slice(5);
+    const t = day.slice(5);
+    return s <= e ? t >= s && t <= e : t >= s || t <= e;
+  }
+  function lastDay(y, m) { return new Date(Date.UTC(y, m, 0)).getUTCDate(); }
+  function dateParts(s) { return { y: Number(s.slice(0, 4)), m: Number(s.slice(5, 7)), d: Number(s.slice(8, 10)) }; }
+
+  // "November", "January/February", "March 3 to 20", with the year when the
+  // row does not repeat.
+  function rangeLabel(r, yearly) {
+    if (!r.start_date || !r.end_date) return "";
+    const a = dateParts(r.start_date), b = dateParts(r.end_date);
+    const yr = (p) => yearly ? "" : " " + p.y;
+    const wholeEnd = b.d === lastDay(b.y, b.m) || (yearly && b.m === 2 && b.d === 28);
+    if (a.d === 1 && wholeEnd) {
+      if (a.m === b.m && a.y === b.y) return MONTHS[a.m - 1] + yr(a);
+      const span = (b.y - a.y) * 12 + b.m - a.m;
+      const join = span === 1 || (yearly && span === -11) ? "/" : " to ";
+      if (yearly || a.y === b.y) return MONTHS[a.m - 1] + join + MONTHS[b.m - 1] + yr(b);
+      return MONTHS[a.m - 1] + yr(a) + join + MONTHS[b.m - 1] + yr(b);
     }
-    return month >= slot.month_start || month <= slot.month_end;
+    if (r.start_date === r.end_date) return MONTHS[a.m - 1] + " " + a.d + (yearly ? "" : ", " + a.y);
+    const end = a.m === b.m && a.y === b.y ? String(b.d) : MONTHS[b.m - 1] + " " + b.d;
+    if (yearly) return MONTHS[a.m - 1] + " " + a.d + " to " + end;
+    if (a.y === b.y) return MONTHS[a.m - 1] + " " + a.d + " to " + end + ", " + b.y;
+    return MONTHS[a.m - 1] + " " + a.d + ", " + a.y + " to " + MONTHS[b.m - 1] + " " + b.d + ", " + b.y;
   }
-
-  // A slot's period is named from its months, so there is nothing to type.
-  function periodLabel(start, end) {
-    if (!start) return "";
-    if (!end || end === start) return MONTHS[start - 1];
-    if (end === start % 12 + 1) return MONTHS[start - 1] + "/" + MONTHS[end - 1];
-    return MONTHS[start - 1] + " to " + MONTHS[end - 1];
+  function periodOf(ranges, yearly) {
+    return ranges.map((r) => rangeLabel(r, yearly)).filter(Boolean).join(", ");
   }
-  function slotPeriod(s) { return periodLabel(s.month_start, s.month_end) || s.label || ""; }
+  function slotPeriod(s) { return periodOf(rangesFor(s.id), s.repeats_yearly !== false) || s.label || ""; }
+  function isCurrentSlot(slot, day) {
+    const yearly = slot.repeats_yearly !== false;
+    return rangesFor(slot.id).some((r) => rangeCovers(r, yearly, day));
+  }
   // Apartment numbers are stored bare. Older rows may still say "Apt 6".
   function apartment(v) { return String(v || "").replace(/^\s*apt\.?\s*/i, "").trim(); }
+  function namesOf(slotId) {
+    return peopleFor(slotId).map((p) => memberById(p.member_id)).filter(Boolean).map((m) => m.name);
+  }
+  function andList(names) {
+    return names.length > 1 ? names.slice(0, -1).join(", ") + " and " + names[names.length - 1] : names[0] || "";
+  }
+  function hourLabel(h) {
+    const n = Number(h) || 0;
+    return (n % 12 || 12) + (n < 12 ? "AM" : "PM");
+  }
+  function remindLabel(sc) {
+    const days = (sc.remind_days || []).slice().sort((a, b) => a - b);
+    if (!days.length) return "";
+    return "Reminders " + andList(days.map((d) => WEEKDAYS[d])) + " at " + hourLabel(sc.remind_hour == null ? 7 : sc.remind_hour);
+  }
 
   function renderSchedules() {
-    const month = new Date().getMonth() + 1;
-    const list = S.schedules.slice().sort((a, b) => (a.position || 0) - (b.position || 0));
+    const today = todayStr();
+    const list = S.schedules.slice().sort(byPosition);
     $("schedule-list").innerHTML = list.map((sc) => {
       const slots = slotsFor(sc.id);
-      const current = slots.find((s) => isCurrentSlot(s, month));
+      const current = slots.find((s) => isCurrentSlot(s, today));
       const rows = slots.map((s) => {
-        const on = current && s.id === current.id;
+        const on = isCurrentSlot(s, today);
         return '<tr class="' + (on ? "slot-current" : "") + '">' +
-          "<td>" + esc(slotPeriod(s)) + (on ? ' <span class="badge badge-open">This month</span>' : "") + "</td>" +
-          "<td>" + esc(apartment(s.responsible) || "Not set") + "</td></tr>";
+          "<td>" + esc(slotPeriod(s)) + (on ? ' <span class="badge badge-open">Now</span>' : "") + "</td>" +
+          "<td>" + esc(apartment(s.responsible)) + "</td>" +
+          "<td>" + esc(namesOf(s.id).join(", ")) +
+            (s.description ? '<div class="sub">' + esc(s.description) + "</div>" : "") + "</td></tr>";
       }).join("");
+      const who = current
+        ? [apartment(current.responsible) ? "apartment " + apartment(current.responsible) : "",
+           andList(namesOf(current.id))].filter(Boolean).join(", ")
+        : "";
+      const reminders = remindLabel(sc);
       return '<article class="schedule-card tone-green">' +
         '<div class="schedule-head">' +
           "<div><h3>" + esc(sc.name) + "</h3>" +
-          (sc.description ? '<p class="sub">' + esc(sc.description) + "</p>" : "") + "</div>" +
+          (sc.description ? '<p class="sub">' + esc(sc.description) + "</p>" : "") +
+          (reminders ? '<p class="sub">' + esc(reminders) + "</p>" : "") + "</div>" +
           '<button type="button" class="btn" data-schedule="' + sc.id + '">Edit</button>' +
         "</div>" +
         (current
-          ? '<p class="schedule-now">Right now: apartment <strong>' + esc(apartment(current.responsible) || "not set") +
-            "</strong>, " + esc(slotPeriod(current)) + "</p>"
+          ? '<p class="schedule-now">Right now: <strong>' + esc(who || "not set") + "</strong>, " +
+            esc(slotPeriod(current)) + "</p>"
           : "") +
         (slots.length
           ? '<div class="table-wrap"><table class="table schedule-table"><thead><tr>' +
-            '<th scope="col">Period</th><th scope="col">Apartment</th>' +
+            '<th scope="col">Period</th><th scope="col">Apartment</th><th scope="col">People</th>' +
             "</tr></thead><tbody>" + rows + "</tbody></table></div>"
           : '<p class="link-none">No rows yet.</p>') +
         "</article>";
@@ -1442,62 +1598,87 @@
     $("schedule-empty").hidden = S.schedules.length > 0;
   }
 
-  // Editor for the rows of a schedule: apartment, first month, last month.
-  // Rows reorder by dragging only and remove with the x, by Evan's choice.
+  // Editor for the rows of a schedule. A row is an apartment, an optional
+  // description, one or more date ranges, and the people on it. Rows reorder
+  // by dragging only and remove with the x, by Evan's choice.
   const slotEditor = (function () {
     let draft = [];
     let removed = [];
     let dragFrom = null;
+    const el = $("cf-slots");
+    const X_ICON = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">' +
+      '<path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+    const GRIP = '<span class="doc-grip" aria-hidden="true"><svg viewBox="0 0 16 16" width="16" height="16">' +
+      '<circle cx="6" cy="4" r="1.4" fill="currentColor"/><circle cx="10" cy="4" r="1.4" fill="currentColor"/>' +
+      '<circle cx="6" cy="8" r="1.4" fill="currentColor"/><circle cx="10" cy="8" r="1.4" fill="currentColor"/>' +
+      '<circle cx="6" cy="12" r="1.4" fill="currentColor"/><circle cx="10" cy="12" r="1.4" fill="currentColor"/>' +
+      "</svg></span>";
 
     function move(from, to) {
       if (to < 0 || to >= draft.length) return;
       draft.splice(to, 0, draft.splice(from, 1)[0]);
       render();
     }
-    function monthOptions(sel, blank) {
-      return '<option value="">' + blank + "</option>" + MONTHS.map((m, i) =>
-        '<option value="' + (i + 1) + '"' + (Number(sel) === i + 1 ? " selected" : "") + ">" +
-        m + "</option>").join("");
+    function personLabel(m) {
+      return m.name + (m.apartment ? ", apartment " + apartment(m.apartment) : "");
     }
-    function render() {
-      const el = $("cf-slots");
-      if (!draft.length) { el.innerHTML = '<p class="link-none">No rows yet.</p>'; return; }
-      el.innerHTML = draft.map((s, i) =>
-        '<div class="doc-row slot-row" draggable="true" data-i="' + i + '">' +
-          '<span class="doc-grip" aria-hidden="true"><svg viewBox="0 0 16 16" width="16" height="16">' +
-            '<circle cx="6" cy="4" r="1.4" fill="currentColor"/><circle cx="10" cy="4" r="1.4" fill="currentColor"/>' +
-            '<circle cx="6" cy="8" r="1.4" fill="currentColor"/><circle cx="10" cy="8" r="1.4" fill="currentColor"/>' +
-            '<circle cx="6" cy="12" r="1.4" fill="currentColor"/><circle cx="10" cy="12" r="1.4" fill="currentColor"/>' +
-          "</svg></span>" +
+    function slotHtml(s, i) {
+      const n = i + 1;
+      const ranges = s.ranges.map((r, j) =>
+        '<div class="range-row">' +
+          '<label class="field"><span class="visually-hidden">Row ' + n + ", from</span>" +
+            '<input class="input" type="date" data-r="start_date" data-i="' + i + '" data-j="' + j + '" value="' + esc(r.start_date || "") + '"></label>' +
+          '<span class="range-to" aria-hidden="true">to</span>' +
+          '<label class="field"><span class="visually-hidden">Row ' + n + ", to</span>" +
+            '<input class="input" type="date" data-r="end_date" data-i="' + i + '" data-j="' + j + '" value="' + esc(r.end_date || "") + '"></label>' +
+          '<button type="button" class="row-x" data-rmr="' + i + ":" + j + '" aria-label="Remove these dates">' + X_ICON + "</button>" +
+        "</div>").join("");
+      const people = s.people.map((p, k) => {
+        const m = memberById(p.member_id);
+        const name = m ? m.name : "Removed person";
+        return '<div class="person-row">' +
+          '<span class="person-name">' + esc(name) + "</span>" +
+          '<label class="checkbox-row"><input type="checkbox" data-pm="' + i + ":" + k + '"' + (p.muted ? "" : " checked") + ">" +
+            '<span>Emails<span class="visually-hidden"> for ' + esc(name) + "</span></span></label>" +
+          '<button type="button" class="row-x" data-rmp="' + i + ":" + k + '" aria-label="Remove ' + esc(name) + '">' + X_ICON + "</button>" +
+        "</div>";
+      }).join("");
+      const taken = new Set(s.people.map((p) => p.member_id));
+      const choices = S.members.filter((m) => !taken.has(m.id))
+        .sort((a, b) => apartment(a.apartment).localeCompare(apartment(b.apartment), undefined, { numeric: true }) || a.name.localeCompare(b.name));
+      return '<div class="doc-row slot-row" draggable="true" data-i="' + i + '">' + GRIP +
+        '<div class="slot-body">' +
           '<div class="doc-fields slot-fields">' +
-            '<label class="field"><span class="visually-hidden">Apartment</span>' +
+            '<label class="field"><span class="visually-hidden">Row ' + n + ", apartment</span>" +
               '<input class="input" data-f="responsible" data-i="' + i + '" placeholder="Apartment" value="' + esc(apartment(s.responsible)) + '"></label>' +
-            '<label class="field"><span class="visually-hidden">First month</span>' +
-              '<select class="input" data-f="month_start" data-i="' + i + '">' + monthOptions(s.month_start, "From") + "</select></label>" +
-            '<label class="field"><span class="visually-hidden">Last month</span>' +
-              '<select class="input" data-f="month_end" data-i="' + i + '">' + monthOptions(s.month_end, "To") + "</select></label>" +
+            '<label class="field"><span class="visually-hidden">Row ' + n + ", description</span>" +
+              '<input class="input" data-f="description" data-i="' + i + '" placeholder="Description (optional)" value="' + esc(s.description || "") + '"></label>' +
           "</div>" +
-          '<button type="button" class="row-x" data-rm="' + i + '" aria-label="Remove row">' +
-            '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">' +
-            '<path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
-          "</div>").join("");
-
-      el.querySelectorAll("[data-f]").forEach((input) =>
-        input.addEventListener("input", () => {
-          const v = input.value;
-          const f = input.dataset.f;
-          draft[Number(input.dataset.i)][f] = (f === "month_start" || f === "month_end")
-            ? (v ? Number(v) : null) : v;
-        }));
-      el.querySelectorAll("[data-rm]").forEach((b) =>
-        b.addEventListener("click", () => {
-          const i = Number(b.dataset.rm);
-          if (draft[i].id) removed.push(draft[i].id);
-          draft.splice(i, 1);
-          render();
-        }));
-      el.querySelectorAll(".doc-row").forEach((row) => {
+          '<div class="slot-ranges">' + ranges +
+            '<div class="slot-line">' +
+              '<button type="button" class="btn" data-addr="' + i + '">Add dates</button>' +
+              '<label class="checkbox-row"><input type="checkbox" data-yearly="' + i + '"' + (s.repeats_yearly ? " checked" : "") + ">" +
+                "<span>Repeats every year</span></label>" +
+            "</div>" +
+          "</div>" +
+          '<div class="slot-people">' + people +
+            (choices.length
+              ? '<label class="field"><span class="visually-hidden">Row ' + n + ", add a person</span>" +
+                '<select class="input" data-addp="' + i + '"><option value="">Add a person</option>' +
+                choices.map((m) => '<option value="' + m.id + '">' + esc(personLabel(m)) + "</option>").join("") +
+                "</select></label>"
+              : "") +
+          "</div>" +
+        "</div>" +
+        '<button type="button" class="row-x" data-rm="' + i + '" aria-label="Remove row ' + n + '">' + X_ICON + "</button>" +
+        "</div>";
+    }
+    function render(focus) {
+      if (!draft.length) { el.innerHTML = '<p class="link-none">No rows yet.</p>'; return; }
+      el.innerHTML = draft.map(slotHtml).join("");
+      el.querySelectorAll(".slot-row").forEach((row) => {
         row.addEventListener("dragstart", (e) => {
+          if (e.target !== row) return;
           dragFrom = Number(row.dataset.i);
           row.classList.add("dragging");
           e.dataTransfer.effectAllowed = "move";
@@ -1513,32 +1694,99 @@
           if (dragFrom != null && dragFrom !== to) move(dragFrom, to);
         });
       });
+      if (focus) { const f = el.querySelector(focus); if (f) f.focus(); }
     }
-    $("cf-slot-add").addEventListener("click", () => {
-      draft.push({ label: "", responsible: "", month_start: null, month_end: null });
-      render();
-      const inputs = $("cf-slots").querySelectorAll('input[data-f="responsible"]');
-      if (inputs.length) inputs[inputs.length - 1].focus();
+    const pair = (v) => v.split(":").map(Number);
+
+    el.addEventListener("input", (e) => {
+      const t = e.target;
+      if (t.dataset.f) draft[Number(t.dataset.i)][t.dataset.f] = t.value;
+      if (t.dataset.r) draft[Number(t.dataset.i)].ranges[Number(t.dataset.j)][t.dataset.r] = t.value;
     });
+    el.addEventListener("change", (e) => {
+      const t = e.target;
+      if (t.dataset.yearly) draft[Number(t.dataset.yearly)].repeats_yearly = t.checked;
+      if (t.dataset.pm) { const [i, k] = pair(t.dataset.pm); draft[i].people[k].muted = !t.checked; }
+      if (t.dataset.addp && t.value) {
+        const i = Number(t.dataset.addp);
+        draft[i].people.push({ member_id: t.value, muted: false });
+        render('[data-addp="' + i + '"]');
+      }
+    });
+    el.addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      if (b.dataset.rm) {
+        const i = Number(b.dataset.rm);
+        if (draft[i].id) removed.push(draft[i].id);
+        draft.splice(i, 1);
+        render();
+      } else if (b.dataset.addr) {
+        const i = Number(b.dataset.addr);
+        draft[i].ranges.push({ start_date: "", end_date: "" });
+        render('[data-r="start_date"][data-i="' + i + '"][data-j="' + (draft[i].ranges.length - 1) + '"]');
+      } else if (b.dataset.rmr) {
+        const [i, j] = pair(b.dataset.rmr);
+        const r = draft[i].ranges.splice(j, 1)[0];
+        if (r.id) draft[i].removedRanges.push(r.id);
+        render('[data-addr="' + i + '"]');
+      } else if (b.dataset.rmp) {
+        const [i, k] = pair(b.dataset.rmp);
+        const p = draft[i].people.splice(k, 1)[0];
+        if (p.id) draft[i].removedPeople.push(p.id);
+        render();
+      }
+    });
+    $("cf-slot-add").addEventListener("click", () => {
+      draft.push({ responsible: "", description: "", repeats_yearly: true,
+        ranges: [{ start_date: "", end_date: "" }], people: [], removedRanges: [], removedPeople: [] });
+      render('[data-f="responsible"][data-i="' + (draft.length - 1) + '"]');
+    });
+
+    // Ranges with neither date are dropped. Rows with no dates, apartment or
+    // people are dropped too.
+    function cleaned(s) {
+      return Object.assign({}, s, { ranges: s.ranges.filter((r) => r.start_date || r.end_date) });
+    }
     return {
       reset(existing) {
         draft = existing.map((s) => ({
-          id: s.id, label: s.label, responsible: s.responsible,
-          month_start: s.month_start, month_end: s.month_end,
+          id: s.id, responsible: s.responsible, description: s.description || "",
+          repeats_yearly: s.repeats_yearly !== false,
+          ranges: rangesFor(s.id).map((r) => ({ id: r.id, start_date: r.start_date, end_date: r.end_date })),
+          people: peopleFor(s.id).map((p) => ({ id: p.id, member_id: p.member_id, muted: !!p.muted })),
+          removedRanges: [], removedPeople: [],
         }));
         removed = [];
         render();
       },
-      rows: () => draft.filter((s) => s.month_start || apartment(s.responsible)),
+      rows: () => draft.map(cleaned)
+        .filter((s) => s.id || s.ranges.length || apartment(s.responsible) || s.people.length || (s.description || "").trim()),
       removed: () => removed,
+      problem() {
+        for (const s of this.rows()) {
+          for (const r of s.ranges) {
+            if (!r.start_date || !r.end_date) return "Each date range needs a start and an end.";
+            if (!s.repeats_yearly && r.end_date < r.start_date) return "A date range ends before it starts.";
+          }
+        }
+        return null;
+      },
     };
   })();
+
+  const remindDayBoxes = () => Array.from(document.querySelectorAll("#cf-days input[type=checkbox]"));
+  $("cf-hour").innerHTML = Array.from({ length: 24 }, (_, h) =>
+    '<option value="' + h + '">' + hourLabel(h) + "</option>").join("");
 
   function openScheduleModal(sc) {
     $("schedule-modal-title").textContent = sc ? "Edit schedule" : "Add schedule";
     $("cf-id").value = sc ? sc.id : "";
     $("cf-name").value = sc ? sc.name : "";
     $("cf-desc").value = sc ? (sc.description || "") : "";
+    const days = (sc && sc.remind_days) || [];
+    remindDayBoxes().forEach((b) => { b.checked = days.includes(Number(b.value)); });
+    $("cf-hour").value = String(sc && sc.remind_hour != null ? sc.remind_hour : 7);
     $("cf-delete").hidden = !sc;
     slotEditor.reset(sc ? slotsFor(sc.id) : []);
     openModal("schedule-modal");
@@ -1547,41 +1795,84 @@
 
   $("schedule-form").addEventListener("submit", async (e) => {
     e.preventDefault();
+    const problem = slotEditor.problem();
+    if (problem) { toast(problem, true); return; }
     const id = $("cf-id").value;
     const row = {
       name: $("cf-name").value.trim(),
       description: $("cf-desc").value.trim() || null,
+      remind_days: remindDayBoxes().filter((b) => b.checked).map((b) => Number(b.value)),
+      remind_hour: Number($("cf-hour").value),
     };
+    const store = getStore();
     try {
       let saved;
       if (id) {
         const existing = S.schedules.find((x) => x.id === id);
-        const patch = await getStore().update("schedules", id, row);
+        const patch = await store.update("schedules", id, row);
         Object.assign(existing, patch || row);
         saved = existing;
       } else {
-        saved = await getStore().insert("schedules", Object.assign({ position: S.schedules.length }, row));
+        saved = await store.insert("schedules", Object.assign({ position: S.schedules.length }, row));
         S.schedules.push(saved);
       }
       for (const rid of slotEditor.removed()) {
-        await getStore().remove("scheduleSlots", rid);
+        await store.remove("scheduleSlots", rid);
         S.scheduleSlots = S.scheduleSlots.filter((x) => x.id !== rid);
+        S.slotRanges = S.slotRanges.filter((x) => x.slot_id !== rid);
+        S.slotPeople = S.slotPeople.filter((x) => x.slot_id !== rid);
       }
       const rows = slotEditor.rows();
       for (let i = 0; i < rows.length; i++) {
         const s = rows[i];
         const patch = {
-          label: periodLabel(s.month_start, s.month_end) || (s.label || "").trim(),
+          label: periodOf(s.ranges, s.repeats_yearly),
           responsible: apartment(s.responsible) || null,
-          month_start: s.month_start || null, month_end: s.month_end || null, position: i,
+          description: (s.description || "").trim() || null,
+          repeats_yearly: !!s.repeats_yearly,
+          position: i,
         };
+        let slotId = s.id;
         if (s.id) {
           const existing = S.scheduleSlots.find((x) => x.id === s.id);
-          await getStore().update("scheduleSlots", s.id, patch);
+          await store.update("scheduleSlots", s.id, patch);
           if (existing) Object.assign(existing, patch);
         } else {
-          S.scheduleSlots.push(await getStore().insert("scheduleSlots",
-            Object.assign({ schedule_id: saved.id }, patch)));
+          const created = await store.insert("scheduleSlots", Object.assign({ schedule_id: saved.id }, patch));
+          S.scheduleSlots.push(created);
+          slotId = created.id;
+        }
+
+        for (const rid of s.removedRanges) {
+          await store.remove("slotRanges", rid);
+          S.slotRanges = S.slotRanges.filter((x) => x.id !== rid);
+        }
+        for (let j = 0; j < s.ranges.length; j++) {
+          const r = s.ranges[j];
+          const rp = { start_date: r.start_date, end_date: r.end_date, position: j };
+          if (r.id) {
+            const existing = S.slotRanges.find((x) => x.id === r.id);
+            await store.update("slotRanges", r.id, rp);
+            if (existing) Object.assign(existing, rp);
+          } else {
+            S.slotRanges.push(await store.insert("slotRanges", Object.assign({ slot_id: slotId }, rp)));
+          }
+        }
+
+        for (const pid of s.removedPeople) {
+          await store.remove("slotPeople", pid);
+          S.slotPeople = S.slotPeople.filter((x) => x.id !== pid);
+        }
+        for (let k = 0; k < s.people.length; k++) {
+          const p = s.people[k];
+          const pp = { member_id: p.member_id, muted: !!p.muted, position: k };
+          if (p.id) {
+            const existing = S.slotPeople.find((x) => x.id === p.id);
+            await store.update("slotPeople", p.id, pp);
+            if (existing) Object.assign(existing, pp);
+          } else {
+            S.slotPeople.push(await store.insert("slotPeople", Object.assign({ slot_id: slotId }, pp)));
+          }
         }
       }
       closeModal("schedule-modal");
@@ -1596,7 +1887,10 @@
     try {
       await getStore().remove("schedules", id);
       S.schedules = S.schedules.filter((x) => x.id !== id);
+      const gone = new Set(S.scheduleSlots.filter((x) => x.schedule_id === id).map((x) => x.id));
       S.scheduleSlots = S.scheduleSlots.filter((x) => x.schedule_id !== id);
+      S.slotRanges = S.slotRanges.filter((x) => !gone.has(x.slot_id));
+      S.slotPeople = S.slotPeople.filter((x) => !gone.has(x.slot_id));
       closeModal("schedule-modal");
       toast("Deleted.");
       renderSchedules();
@@ -1609,8 +1903,9 @@
   // Reminder settings
   // ------------------------------------------------------------------
   const DEFAULT_SETTINGS = {
-    id: 1, reminders_enabled: false, frequency: "monthly", send_weekday: 1,
-    send_day_of_month: 1, delivery_mode: "digest", digest_email: null, last_sent_at: null,
+    id: 1, reminders_enabled: false, due_notices_enabled: false, schedule_reminders_enabled: false,
+    frequency: "monthly", send_weekday: 1, send_day_of_month: 1, delivery_mode: "digest",
+    digest_email: null, last_sent_at: null,
   };
   const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -1620,6 +1915,8 @@
       reminders_enabled: monthly,
       frequency: "monthly",
       send_day_of_month: Number($("sf-monthday").value) || 1,
+      due_notices_enabled: $("sf-due-on").checked,
+      schedule_reminders_enabled: $("sf-sched-on").checked,
     };
   }
 
@@ -1628,6 +1925,10 @@
     $("sf-monthly").checked = !!s.reminders_enabled;
     $("sf-never").checked = !s.reminders_enabled;
     $("sf-monthday").value = s.send_day_of_month || 1;
+    $("sf-due-on").checked = !!s.due_notices_enabled;
+    $("sf-due-off").checked = !s.due_notices_enabled;
+    $("sf-sched-on").checked = !!s.schedule_reminders_enabled;
+    $("sf-sched-off").checked = !s.schedule_reminders_enabled;
     refreshSettingsVisibility();
   }
 
@@ -1636,7 +1937,7 @@
     $("sf-monthday-field").hidden = !monthly;
     const to = (S.settings && S.settings.digest_email) || "";
     $("sf-recipient-line").innerHTML = monthly
-      ? (to ? "Emails go to <b>" + esc(to) + "</b> at 9AM EST."
+      ? (to ? "Emails go to <b>" + esc(to) + "</b> at 9AM Eastern."
             : "No recipient is set yet.")
       : "";
     $("sf-test").disabled = !to;
@@ -1652,13 +1953,13 @@
       const patch = await getStore().update("settings", 1, row);
       Object.assign(S.settings, patch || row);
       renderSettings();
-      toast(row.reminders_enabled ? "Saved. Monthly email is on." : "Saved. No emails will be sent.");
+      toast("Saved.");
     } catch (err) { fail(err); }
   });
 
   // Calls the Edge Function. Preview shows the real email in a dialog and
   // never sends. Send now delivers immediately.
-  async function callReminderFunction(mode) {
+  async function callReminderFunction(mode, kind) {
     const body = $("sf-preview-body");
     const frame = $("sf-preview-frame");
     frame.hidden = true;
@@ -1671,8 +1972,8 @@
     }
     body.innerHTML = '<p class="muted">Working.</p>';
     try {
-      const url = CFG.SUPABASE_URL.replace(/\/$/, "") +
-        "/functions/v1/send-reminders?" + (mode === "dry" ? "dry=1" : "force=1");
+      const url = apiBase() + "/functions/v1/send-reminders?" +
+        (mode === "dry" ? "dry=1&kind=" + encodeURIComponent(kind || "summary") : "force=1");
       const resp = await fetch(url, {
         method: "POST",
         headers: {
@@ -1693,10 +1994,13 @@
           return;
         }
         const to = (data.recipients || []).map((r) => r.to).join(", ");
-        body.innerHTML =
-          "<p><b>To:</b> " + esc(to || "nobody") + "<br><b>Subject:</b> " + esc(data.subject || "") + "</p>";
+        const others = (data.wouldSend || 0) > 1 ? " This is the first of " + data.wouldSend + " emails." : "";
+        body.innerHTML = (data.note || others ? '<p class="muted">' + esc((data.note || "") + others) + "</p>" : "") +
+          (data.html
+            ? "<p><b>To:</b> " + esc(to || "nobody") + "<br><b>Subject:</b> " + esc(data.subject || "") + "</p>"
+            : "");
         frame.srcdoc = data.html || "";
-        frame.hidden = false;
+        frame.hidden = !data.html;
       } else {
         const sent = data.sent || 0;
         body.innerHTML = sent
@@ -1718,7 +2022,9 @@
     }
   }
 
-  $("sf-preview").addEventListener("click", () => callReminderFunction("dry"));
+  $("sf-preview").addEventListener("click", () => callReminderFunction("dry", "summary"));
+  $("sf-preview-due").addEventListener("click", () => callReminderFunction("dry", "due"));
+  $("sf-preview-schedule").addEventListener("click", () => callReminderFunction("dry", "schedule"));
   $("sf-test").addEventListener("click", () => {
     const to = (S.settings && S.settings.digest_email) || "the address on file";
     if (!confirm("Send the summary to " + to + " now?")) return;
@@ -1835,6 +2141,7 @@
   $("btn-new-vendor").addEventListener("click", () => openVendorModal(null));
   $("btn-new-account").addEventListener("click", () => openAccountModal(null));
   $("btn-new-member").addEventListener("click", () => openMemberModal(null));
+  $("btn-new-resident").addEventListener("click", () => openMemberModal(null, true));
   $("btn-new-role").addEventListener("click", () => openRoleModal(null));
   $("filter-toggle").addEventListener("click", () => {
     const open = $("filter-panel").hidden;
@@ -1909,6 +2216,9 @@
       S.settings = Object.assign({}, DEFAULT_SETTINGS, S.settings || {});
       S.schedules = S.schedules || [];
       S.scheduleSlots = S.scheduleSlots || [];
+      S.slotRanges = S.slotRanges || [];
+      S.slotPeople = S.slotPeople || [];
+      S.secrets = S.secrets || [];
       S.fixtures = S.fixtures || [];
       await hashEmails();
       renderFilterOptions();

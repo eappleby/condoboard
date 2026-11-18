@@ -184,6 +184,7 @@
     <section id="view-board" class="view" aria-label="Board members" hidden>
       <div class="section-head">
         <button class="btn" id="btn-new-role">Add role</button>
+        <button class="btn" id="btn-new-resident">Add resident</button>
         <button class="btn btn-primary" id="btn-new-member">Add member</button>
       </div>
       <h2 class="group-heading tone-purple">Roles</h2>
@@ -191,6 +192,8 @@
       <h2 class="group-heading tone-blue">Members</h2>
       <div class="card-grid" id="member-grid"></div>
       <p class="empty-note" id="member-empty" hidden>No board members yet.</p>
+      <h2 class="group-heading tone-slate" id="resident-heading" hidden>Residents</h2>
+      <div class="card-grid" id="resident-grid"></div>
     </section>
 
     <!-- ============ FIXTURES ============ -->
@@ -215,8 +218,8 @@
     <section id="view-notifications" class="view" aria-label="Notifications" hidden>
       <form id="settings-form" class="settings-form">
         <fieldset class="settings-block tone-blue">
-          <legend>Email delivery</legend>
-          <div class="radio-set" role="radiogroup" aria-label="Email delivery">
+          <legend>Monthly summary</legend>
+          <div class="radio-set" role="radiogroup" aria-label="Monthly summary">
             <label class="radio-row">
               <input type="radio" name="sf-cadence" id="sf-monthly" value="monthly">
               <span>Monthly</span>
@@ -231,12 +234,50 @@
             <input class="input" type="number" min="1" max="28" id="sf-monthday">
           </label>
           <p class="hint" id="sf-recipient-line"></p>
+          <div class="settings-actions">
+            <button type="button" class="btn" id="sf-preview">Preview<span class="visually-hidden"> the monthly summary</span></button>
+            <button type="button" class="btn" id="sf-test">Send it now</button>
+          </div>
+        </fieldset>
+
+        <fieldset class="settings-block tone-amber">
+          <legend>Due notices</legend>
+          <div class="radio-set" role="radiogroup" aria-label="Due notices">
+            <label class="radio-row">
+              <input type="radio" name="sf-due" id="sf-due-on" value="on">
+              <span>On</span>
+            </label>
+            <label class="radio-row">
+              <input type="radio" name="sf-due" id="sf-due-off" value="off" checked>
+              <span>Off</span>
+            </label>
+          </div>
+          <p class="hint">Sent at 9AM Eastern to the role holder, 7 days before the due date, on it, and weekly while overdue. Only for responsibilities set to send reminder emails.</p>
+          <div class="settings-actions">
+            <button type="button" class="btn" id="sf-preview-due">Preview<span class="visually-hidden"> a due notice</span></button>
+          </div>
+        </fieldset>
+
+        <fieldset class="settings-block tone-green">
+          <legend>Schedule reminders</legend>
+          <div class="radio-set" role="radiogroup" aria-label="Schedule reminders">
+            <label class="radio-row">
+              <input type="radio" name="sf-sched" id="sf-sched-on" value="on">
+              <span>On</span>
+            </label>
+            <label class="radio-row">
+              <input type="radio" name="sf-sched" id="sf-sched-off" value="off" checked>
+              <span>Off</span>
+            </label>
+          </div>
+          <p class="hint">Days and time are set on each schedule.</p>
+          <div class="settings-actions">
+            <button type="button" class="btn" id="sf-preview-schedule">Preview<span class="visually-hidden"> a schedule reminder</span></button>
+          </div>
         </fieldset>
 
         <div class="settings-actions">
           <button type="submit" class="btn btn-primary">Save</button>
-          <button type="button" class="btn" id="sf-preview">Preview the email</button>
-          <button type="button" class="btn" id="sf-test">Send it now</button>
         </div>
       </form>
     </section>
@@ -329,6 +370,10 @@
             </select>
           </label>
         </div>
+        <label class="checkbox-row check-field">
+          <input type="checkbox" id="tf-remind">
+          <span>Send reminder emails</span>
+        </label>
         <fieldset class="links-fieldset">
           <legend>Documents</legend>
           <div id="tf-links"></div>
@@ -439,6 +484,16 @@
             <span>Username</span>
             <input class="input" id="af-username">
           </label>
+        </div>
+        <div class="field" id="af-password-field">
+          <label for="af-password" class="field-label">Password</label>
+          <div class="password-wrap">
+            <input class="input" id="af-password" type="password" autocomplete="off" spellcheck="false" autocapitalize="off">
+            <button type="button" class="password-toggle" id="af-password-toggle" aria-controls="af-password" aria-pressed="false" aria-label="Show password">
+              <svg id="af-eye-open" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+              <svg id="af-eye-shut" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false" hidden><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 4l16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </div>
         </div>
         <label class="field">
           <span>Portal address</span>
@@ -570,6 +625,22 @@
           <textarea class="input" id="cf-desc" rows="2"></textarea>
         </label>
         <fieldset class="links-fieldset">
+          <legend>Reminder emails</legend>
+          <div class="day-set" id="cf-days" role="group" aria-label="Days">
+            <label class="day-chip"><input type="checkbox" value="0"><span>Sun</span></label>
+            <label class="day-chip"><input type="checkbox" value="1"><span>Mon</span></label>
+            <label class="day-chip"><input type="checkbox" value="2"><span>Tue</span></label>
+            <label class="day-chip"><input type="checkbox" value="3"><span>Wed</span></label>
+            <label class="day-chip"><input type="checkbox" value="4"><span>Thu</span></label>
+            <label class="day-chip"><input type="checkbox" value="5"><span>Fri</span></label>
+            <label class="day-chip"><input type="checkbox" value="6"><span>Sat</span></label>
+          </div>
+          <label class="field hour-field">
+            <span>Time</span>
+            <select class="input" id="cf-hour"></select>
+          </label>
+        </fieldset>
+        <fieldset class="links-fieldset">
           <legend>Rotation</legend>
           <div id="cf-slots"></div>
           <button type="button" class="btn" id="cf-slot-add">Add a row</button>
@@ -608,6 +679,10 @@
         <label class="field">
           <span>Phone</span>
           <input class="input" id="mf-phone" type="tel">
+        </label>
+        <label class="checkbox-row check-field">
+          <input type="checkbox" id="mf-board">
+          <span>On the board</span>
         </label>
         <div class="modal-actions">
           <button type="button" class="btn btn-danger" id="mf-delete" hidden>Delete</button>

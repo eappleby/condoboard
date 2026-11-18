@@ -1,21 +1,25 @@
--- Condo Board — schedule the daily reminder emails.
+-- 372 12th board tracker. Schedule the reminder emails.
 --
--- Run this in the Supabase SQL Editor AFTER deploying the send-reminders
--- Edge Function (see README.md, "Reminder emails").
+-- Run this in the Supabase SQL Editor after deploying the send-reminders
+-- Edge Function (see README.md, "Emails"). Not a migration, because it holds
+-- the project ref and the anon key.
 --
--- Replace the two placeholders first:
---   YOUR_PROJECT_REF — the part before .supabase.co in your project URL
---   YOUR_ANON_KEY    — the same anon key you put in config.js
+-- The job runs every hour. The function works out the hour in New York and
+-- decides what, if anything, goes out: the monthly summary and due notices
+-- at 9AM, and each schedule's reminders at the hour set on that schedule.
+-- Running it hourly is what keeps 7AM at 7AM through daylight saving time.
 --
--- The schedule below is 13:00 UTC = 9:00 AM Eastern (8 AM during standard
--- time). Adjust the cron expression if you want a different hour.
+-- Running this file again replaces the old daily job.
 
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 
+select cron.unschedule(jobname) from cron.job
+ where jobname in ('condo-board-daily-reminders', 'condo-board-hourly-reminders');
+
 select cron.schedule(
-  'condo-board-daily-reminders',
-  '0 13 * * *',
+  'condo-board-hourly-reminders',
+  '0 * * * *',
   $$
   select net.http_post(
     url     := 'https://wnmvehzatnclhogihlnx.supabase.co/functions/v1/send-reminders',
@@ -30,4 +34,4 @@ select cron.schedule(
 
 -- Useful later:
 --   select * from cron.job;                      -- list scheduled jobs
---   select cron.unschedule('condo-board-daily-reminders');  -- turn it off
+--   select cron.unschedule('condo-board-hourly-reminders');  -- turn it off

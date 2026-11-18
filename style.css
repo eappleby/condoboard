@@ -463,8 +463,18 @@ textarea.input { min-height: 80px; }
 .field > span { font-size: 15px; font-weight: 600; color: var(--text); }
 .field .req, .field .hint { font-weight: 400; color: var(--text-soft); font-size: 14px; }
 .field-row { display: flex; gap: 16px; }
+.field-label { font-size: 15px; font-weight: 600; color: var(--text); }
+.check-field { min-height: 44px; font-size: 16px; color: var(--text); cursor: pointer; }
+.password-wrap { position: relative; display: flex; }
+.password-wrap .input { flex: 1; min-width: 0; padding-right: 52px; }
+.password-toggle {
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 8px; background: none; color: var(--text-soft); cursor: pointer;
+}
+.password-toggle:hover { color: var(--text); background: var(--surface-alt); }
 
-.links-fieldset { border: 2px solid var(--border); border-radius: 10px; padding: 16px; margin: 0; }
+.links-fieldset { border: 2px solid var(--border); border-radius: 10px; padding: 16px; margin: 0; min-width: 0; }
 .links-fieldset legend { font-size: 15px; font-weight: 700; padding: 0 8px; }
 .link-none { color: var(--text-soft); font-size: 15px; margin: 0 0 12px; }
 .links-fieldset .hint { color: var(--text-soft); font-size: 14px; margin: 0 0 12px; }
@@ -483,8 +493,25 @@ textarea.input { min-height: 80px; }
 }
 .doc-grip:active { cursor: grabbing; }
 .doc-fields { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; flex: 1; min-width: 0; }
-.slot-fields { grid-template-columns: 1fr 1fr 1fr; }
-.slot-row { align-items: center; }
+.slot-fields { grid-template-columns: 1fr 2fr; }
+.slot-row { align-items: flex-start; }
+.slot-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.slot-ranges, .slot-people { display: flex; flex-direction: column; gap: 8px; }
+.range-row { display: flex; align-items: center; gap: 8px; }
+.range-row .field { flex: 1; min-width: 0; }
+.slot-body .input { min-width: 0; width: 100%; }
+.range-to { color: var(--text-soft); font-size: 15px; }
+.slot-line { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.person-row { display: flex; align-items: center; gap: 12px; }
+.person-name { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.day-set { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.day-chip {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px;
+  border: 2px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 16px; background: var(--surface);
+}
+.day-chip input { width: 20px; height: 20px; margin: 0; accent-color: var(--primary); }
+.day-chip:has(input:checked) { border-color: var(--primary); background: var(--primary-soft); }
+.hour-field { max-width: 200px; }
 .row-x {
   flex: 0 0 auto; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center;
   border: 0; border-radius: 8px; background: none; color: var(--text-soft); cursor: pointer;
@@ -524,6 +551,7 @@ textarea.input { min-height: 80px; }
 .schedule-table { min-width: 320px; }
 .schedule-table tbody tr { cursor: default; }
 .schedule-table tr.slot-current td { background: var(--green-soft); font-weight: 700; }
+.schedule-table .sub { font-weight: 400; font-size: 14px; color: var(--text-soft); margin: 2px 0 0; }
 
 .modal-actions { display: flex; gap: 12px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
 .modal-actions .spacer { flex: 1; }
